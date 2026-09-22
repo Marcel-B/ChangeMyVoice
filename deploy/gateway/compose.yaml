@@ -25,9 +25,11 @@ services:
       Gateway__Clients__0__KeySha256: ${CHANGEMYVOICE_CLIENT_HASH}
       Gateway__Clients__0__RequestsPerMinute: "60"
     healthcheck:
-      test: ["CMD", "dotnet", "ChangeMyVoice.Gateway.dll", "--healthcheck"]
+      # Das schlanke Abbild bringt weder curl noch die dotnet-CLI mit; die
+      # Anwendung prueft sich deshalb selbst.
+      test: ["CMD", "/app/ChangeMyVoice.Gateway", "--healthcheck"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
     logging:
       driver: json-file

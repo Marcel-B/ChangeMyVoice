@@ -178,6 +178,15 @@ cp deploy/launchd/com.b-velop.changemyvoice.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.b-velop.changemyvoice.plist
 ```
 
+Das Gateway ist zustandslos — es haelt weder Auftraege noch Dateien; die
+Ergebnisse liegen alle auf dem Mac. Ein Neustart des Containers verliert daher
+nichts, und er kommt mit wenig aus: 256 bis 512 MB Arbeitsspeicher und eine
+vCPU genuegen. Auch grosse Uploads aendern daran nichts, weil sie
+durchgereicht und nicht zwischengespeichert werden.
+
+Das Laufzeitabbild ist ein *chiseled*-Abbild ohne Paketverwaltung und ohne
+Kommandozeile. Das haelt es klein und verkleinert die Angriffsflaeche.
+
 Das Gateway auf Proxmox:
 
 ```bash
