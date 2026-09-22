@@ -206,10 +206,12 @@ Drei Punkte hängen zusammen und müssen zueinander passen:
 3. **Das Gateway spricht den MagicDNS-Namen an**, nicht die IP-Adresse. Der
    Name bleibt gültig, falls der Knoten je eine andere Adresse bekommt.
 
-Einrichten des Containers:
+Die vollständige Einrichtung des Containers — von den Proxmox-Berechtigungen
+über Tailscale bis zum Reverse Proxy — steht in
+[docs/gateway-container-einrichten.md](docs/gateway-container-einrichten.md).
+Kurzfassung für einen bereits vorbereiteten Container:
 
 ```bash
-# im CT, nach der Docker-Installation
 tailscale up                 # Knoten anmelden
 tailscale ip -4              # diese Adresse in die Freigabeliste des Macs
 
@@ -221,8 +223,7 @@ docker compose pull && docker compose up -d
 ```
 
 Ein Anmelden an der Registry ist nicht nötig, das Abbild ist öffentlich
-abrufbar. In einem LXC-Container braucht Docker `nesting=1` in der
-Container-Konfiguration.
+abrufbar.
 
 Das Gateway ist zustandslos — es haelt weder Auftraege noch Dateien; die
 Ergebnisse liegen alle auf dem Mac. Ein Neustart des Containers verliert daher
