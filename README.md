@@ -54,6 +54,7 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 | `GET` | `/voices/{id}` | Einzelne Referenzstimme abrufen |
 | `DELETE` | `/voices/{id}` | Referenzstimme löschen |
 | `POST` | `/jobs` | Stimme zur Änderung senden |
+| `GET` | `/jobs` | Alle Aufträge anzeigen (seitenweise, filterbar) |
 | `GET` | `/jobs/{id}` | Status abfragen |
 | `GET` | `/jobs/{id}/result` | Ergebnis herunterladen |
 | `DELETE` | `/jobs/{id}` | Auftrag abbrechen |

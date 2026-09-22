@@ -53,6 +53,19 @@ public sealed class InMemoryConversionJobRepository : IConversionJobRepository
         Task.FromResult<IReadOnlyList<ConversionJob>>(
             _jobs.Values.Where(j => !j.ArtifactsPurged).ToArray());
 
+    public Task<IReadOnlyList<ConversionJob>> ListAsync(
+        JobStatus? status, int limit, int offset, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ConversionJob>>(
+            _jobs.Values
+                .Where(j => status is null || j.Status == status)
+                .OrderByDescending(j => j.CreatedAtUtc)
+                .Skip(offset)
+                .Take(limit)
+                .ToArray());
+
+    public Task<int> CountAsync(JobStatus? status, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_jobs.Values.Count(j => status is null || j.Status == status));
+
     public Task<bool> HasActiveJobForVoiceAsync(VoiceId voiceId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_jobs.Values.Any(j => j.VoiceId == voiceId && !j.IsTerminal));
 

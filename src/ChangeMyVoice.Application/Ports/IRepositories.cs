@@ -35,6 +35,24 @@ public interface IConversionJobRepository
     Task<IReadOnlyList<ConversionJob>> ListUnpurgedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Liest einen Ausschnitt aller Aufträge, die jüngsten zuerst.
+    /// </summary>
+    /// <remarks>
+    /// Bewusst seitenweise: Aufgeräumte Aufträge bleiben als Datensatz erhalten,
+    /// die Gesamtzahl wächst also dauerhaft. Eine Abfrage ohne Grenze würde mit
+    /// der Zeit immer langsamer und die Antwort immer größer.
+    /// </remarks>
+    /// <param name="status">Auf diesen Zustand einschränken, oder <c>null</c> für alle.</param>
+    /// <param name="limit">Wie viele Einträge höchstens.</param>
+    /// <param name="offset">Wie viele Einträge übersprungen werden.</param>
+    /// <param name="cancellationToken">Abbruchsteuerung.</param>
+    Task<IReadOnlyList<ConversionJob>> ListAsync(
+        JobStatus? status, int limit, int offset, CancellationToken cancellationToken = default);
+
+    /// <summary>Zählt die Aufträge, die zum Filter passen.</summary>
+    Task<int> CountAsync(JobStatus? status, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Prüft, ob eine Stimme noch von einem unerledigten Auftrag benötigt wird.
     /// </summary>
     Task<bool> HasActiveJobForVoiceAsync(VoiceId voiceId, CancellationToken cancellationToken = default);
