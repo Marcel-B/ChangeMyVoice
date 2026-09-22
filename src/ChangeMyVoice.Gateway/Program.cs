@@ -33,6 +33,14 @@ if (args.Contains("--healthcheck"))
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Zusaetzliche Einstellungen aus einem eingehaengten Verzeichnis. Ueber
+// Umgebungsvariablen laesst sich zwar auch eine Liste abbilden
+// (Clients__0__Name, Clients__1__Name, ...), das wird bei mehreren Aufrufern
+// aber schnell unuebersichtlich. Eine Datei bleibt lesbar und laesst sich
+// versionieren, ohne dass Geheimnisse ins Abbild wandern.
+builder.Configuration.AddJsonFile(
+    "/app/config/clients.json", optional: true, reloadOnChange: true);
+
 builder.Services.AddOptions<GatewayOptions>()
     .Bind(builder.Configuration.GetSection(GatewayOptions.SectionName))
     .ValidateDataAnnotations()

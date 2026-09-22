@@ -21,9 +21,12 @@ services:
       DOTNET_ENVIRONMENT: Production
       Gateway__UpstreamBaseAddress: ${CHANGEMYVOICE_UPSTREAM}
       Gateway__UpstreamApiKey: ${CHANGEMYVOICE_UPSTREAM_KEY}
-      Gateway__Clients__0__Name: ${CHANGEMYVOICE_CLIENT_NAME}
-      Gateway__Clients__0__KeySha256: ${CHANGEMYVOICE_CLIENT_HASH}
-      Gateway__Clients__0__RequestsPerMinute: "60"
+      # Die zugelassenen Aufrufer stehen in config/clients.json, nicht hier:
+      # Bei mehreren Anwendungen waere eine Umgebungsvariable je Feld schnell
+      # unuebersichtlich.
+    volumes:
+      # Nur lesend eingehaengt; das Gateway schreibt nichts.
+      - ./config:/app/config:ro
     healthcheck:
       # Das schlanke Abbild bringt weder curl noch die dotnet-CLI mit; die
       # Anwendung prueft sich deshalb selbst.
