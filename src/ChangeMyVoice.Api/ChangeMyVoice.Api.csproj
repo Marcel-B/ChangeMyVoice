@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChangeMyVoice.Application\ChangeMyVoice.Application.csproj" />
+    <ProjectReference Include="..\ChangeMyVoice.Adapters.Persistence\ChangeMyVoice.Adapters.Persistence.csproj" />
+    <ProjectReference Include="..\ChangeMyVoice.Adapters.Storage\ChangeMyVoice.Adapters.Storage.csproj" />
+    <ProjectReference Include="..\ChangeMyVoice.Adapters.Inference\ChangeMyVoice.Adapters.Inference.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChangeMyVoice.Api.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

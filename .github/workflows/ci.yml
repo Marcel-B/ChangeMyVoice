@@ -1,0 +1,90 @@
+name: Build und Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # Damit der Abbild-Workflow diesen hier voranstellen kann.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build und Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: .NET einrichten
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Die Audio-Adapter werden gegen echte Dateien geprüft. Ohne ffmpeg würden
+      # sich diese Tests stillschweigend überspringen — genau die Prüfungen, die
+      # belegen, dass die Formatkette stimmt.
+      - name: ffmpeg installieren
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Abhängigkeiten wiederherstellen
+        run: dotnet restore
+
+      - name: Bauen
+        run: dotnet build --configuration Release --no-restore
+
+      # Ausgeschlossen bleibt nur, was ein echtes Modell und Apple-Silicon
+      # braucht; alles andere läuft hier vollständig.
+      - name: Tests
+        run: >
+          dotnet test --configuration Release --no-build
+          --filter "Category!=RealInference"
+          --logger "trx;LogFileName=testergebnisse.trx"
+          --results-directory ./testergebnisse
+
+      - name: Testergebnisse sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testergebnisse
+          path: ./testergebnisse
+          retention-days: 14
+
+  openapi:
+    name: Schnittstellenbeschreibung
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: .NET einrichten
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Die CLAUDE.md verlangt, dass jeder Endpunkt vollständig in der
+      # OpenAPI-Beschreibung steht. Hier wird die erzeugte Beschreibung gegen den
+      # eingecheckten Stand gehalten: Wer einen Endpunkt ändert, ohne den Vertrag
+      # nachzuziehen, bekommt einen roten Build statt einer stillen Abweichung.
+      - name: Beschreibung erzeugen und vergleichen
+        run: |
+          dotnet build src/ChangeMyVoice.Api --configuration Release
+          ./scripts/export-openapi.sh /tmp/openapi-v1.json
+
+          if ! diff -u docs/openapi/v1.json /tmp/openapi-v1.json; then
+            echo "::error::Die Schnittstellenbeschreibung weicht vom eingecheckten Stand ab."
+            echo "Bitte ./scripts/export-openapi.sh docs/openapi/v1.json ausführen und übernehmen."
+            exit 1
+          fi
+
+      - name: Beschreibung sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: /tmp/openapi-v1.json
+          retention-days: 14

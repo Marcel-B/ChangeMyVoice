@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="Xunit.SkippableFact" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChangeMyVoice.Adapters.Persistence\ChangeMyVoice.Adapters.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\ChangeMyVoice.Adapters.Storage\ChangeMyVoice.Adapters.Storage.csproj" />
+    <ProjectReference Include="..\..\src\ChangeMyVoice.Adapters.Inference\ChangeMyVoice.Adapters.Inference.csproj" />
+  </ItemGroup>
+
+</Project>

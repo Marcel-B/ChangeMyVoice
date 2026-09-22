@@ -1,0 +1,36 @@
+# Betrieb des Gateways auf dem Proxmox-Host.
+#
+#   docker compose pull && docker compose up -d
+#
+# Die Geheimnisse stehen in einer .env-Datei daneben, nicht in dieser Datei und
+# nicht im Abbild:
+#
+#   CHANGEMYVOICE_UPSTREAM=http://<mac-adresse>:5080
+#   CHANGEMYVOICE_UPSTREAM_KEY=<schluessel-der-mac-api>
+#   CHANGEMYVOICE_CLIENT_NAME=studio-app
+#   CHANGEMYVOICE_CLIENT_HASH=<sha256-des-client-schluessels>
+
+services:
+  gateway:
+    image: ghcr.io/${GITHUB_OWNER:-b-velop}/changemyvoice-gateway:latest
+    container_name: changemyvoice-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Gateway__UpstreamBaseAddress: ${CHANGEMYVOICE_UPSTREAM}
+      Gateway__UpstreamApiKey: ${CHANGEMYVOICE_UPSTREAM_KEY}
+      Gateway__Clients__0__Name: ${CHANGEMYVOICE_CLIENT_NAME}
+      Gateway__Clients__0__KeySha256: ${CHANGEMYVOICE_CLIENT_HASH}
+      Gateway__Clients__0__RequestsPerMinute: "60"
+    healthcheck:
+      test: ["CMD", "dotnet", "ChangeMyVoice.Gateway.dll", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

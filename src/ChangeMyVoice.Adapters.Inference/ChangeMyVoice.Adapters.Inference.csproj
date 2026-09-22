@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChangeMyVoice.Application\ChangeMyVoice.Application.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <!-- Damit die Tests die zusammengebaute Argumentliste pruefen koennen, ohne
+         sie oeffentlich machen zu muessen. -->
+    <InternalsVisibleTo Include="ChangeMyVoice.Adapters.Tests" />
+  </ItemGroup>
+
+</Project>
