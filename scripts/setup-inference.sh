@@ -160,7 +160,10 @@ echo
 if [[ $FEHLER -eq 0 ]]; then
     echo "Die Umgebung ist einsatzbereit."
     if [[ $MIT_F0 -eq 0 ]]; then
-        echo "Hinweis: Fuer den eigentlichen Gesangspfad zusaetzlich --with-f0 ausfuehren."
+        echo
+        echo "ACHTUNG: Der Gesangspfad ist die Voreinstellung der API, seine"
+        echo "Modelle wurden hier aber nicht geprueft. Vor dem ersten Einsatz"
+        echo "einmal mit --with-f0 ausfuehren, sonst scheitert der erste Auftrag."
     fi
 else
     echo "Es sind offene Punkte verblieben." >&2

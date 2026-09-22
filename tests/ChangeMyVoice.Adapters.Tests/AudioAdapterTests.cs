@@ -240,17 +240,17 @@ public class MlxVcConversionEngineTests
     }
 
     [Fact]
-    public void Ohne_F0_Konditionierung_wird_der_Schalter_weggelassen()
+    public void In_der_Voreinstellung_wird_der_Gesangsschalter_gesetzt()
     {
-        Sut().BuildArguments(Request()).ShouldNotContain("--f0-condition");
+        Sut().BuildArguments(Request()).ShouldContain("--f0-condition");
     }
 
     [Fact]
-    public void Mit_F0_Konditionierung_wird_der_Schalter_gesetzt()
+    public void Im_Sprachpfad_wird_der_Schalter_weggelassen()
     {
-        ConversionOptions.TryCreate(null, null, null, true, null, out var options, out _);
+        ConversionOptions.TryCreate(null, null, null, false, null, out var options, out _);
 
-        Sut().BuildArguments(Request(options)).ShouldContain("--f0-condition");
+        Sut().BuildArguments(Request(options)).ShouldNotContain("--f0-condition");
     }
 
     [Fact]

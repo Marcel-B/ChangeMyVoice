@@ -18,11 +18,17 @@ public sealed record ConversionOptions
     public double LengthAdjust { get; private init; } = 1.0;
 
     /// <summary>
-    /// Ob mit F0-Konditionierung gearbeitet wird. Das ist der eigentliche
-    /// Gesangspfad (44,1 kHz); ohne ihn bleibt die Tonhöhenführung schwächer.
-    /// Standardmäßig aus, solange das zugehörige Checkpoint nicht verifiziert ist.
+    /// Ob mit F0-Konditionierung gearbeitet wird.
     /// </summary>
-    public bool F0Condition { get; private init; }
+    /// <remarks>
+    /// Das ist der Gesangspfad: 44,1 kHz mit Tonhöhenkonditionierung. Er ist
+    /// die Voreinstellung, weil dieser Dienst für Gesang gedacht ist und ohne
+    /// ihn die Tonhöhenführung schwächer bleibt — das Ergebnis klingt dann eher
+    /// nach Sprachumwandlung. Er kostet spürbar mehr Zeit: bei rund 15 Sekunden
+    /// Material etwa 60 statt 40 Sekunden. Wer den schnelleren Sprachpfad
+    /// braucht, schaltet ihn je Auftrag mit <c>f0Condition=false</c> ab.
+    /// </remarks>
+    public bool F0Condition { get; private init; } = true;
 
     /// <summary>Ob der Diffusionsschritt in halber Genauigkeit läuft.</summary>
     public bool Fp16 { get; private init; } = true;

@@ -20,7 +20,12 @@ internal static class JobEndpoints
                 "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit "
                 + "der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt "
                 + "wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt "
-                + "erhalten, das Timbre stammt aus der Referenz.")
+                + "erhalten, das Timbre stammt aus der Referenz.\n\n"
+                + "Standardmäßig läuft die Konvertierung im Gesangspfad: 44,1 kHz mit "
+                + "Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. "
+                + "Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 "
+                + "Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere "
+                + "Sprachpfad bei 22,05 kHz.")
             .DisableAntiforgery()
             .Produces<JobResponse>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status400BadRequest)

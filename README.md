@@ -100,8 +100,8 @@ Modelllauf tatsächlich verwendet:
 
 | Pfad | Zielrate | angefordert mit |
 | --- | --- | --- |
-| ohne F0-Konditionierung (Sprache) | 22 050 Hz | Voreinstellung |
-| mit F0-Konditionierung (Gesang) | 44 100 Hz | `f0Condition=true` |
+| mit F0-Konditionierung (Gesang) | 44 100 Hz | Voreinstellung |
+| ohne F0-Konditionierung (Sprache) | 22 050 Hz | `f0Condition=false` |
 
 Das ist kein Zufallswert: `seed_vc_infer.py` lädt seine Eingaben mit
 `librosa.load(pfad, sr=…)` und `mono=True`, rechnet also selbst um. Würde die API
@@ -266,15 +266,14 @@ sich nur an einer tatsächlich umgewandelten Datei nachmessen.
   protokolliert, damit ein späterer Umbau begründet entschieden werden kann;
   hinter `IVoiceConversionEngine` ist er austauschbar, ohne dass Domäne,
   Anwendungsfälle oder API sich ändern.
-- **Der Gesangspfad ist nicht voreingestellt.** `f0_condition` ist standardmäßig
-  aus. Erst damit läuft die Konvertierung bei 44,1 kHz mit F0-Konditionierung,
-  und erst dann wird die Tonhöhe sauber übertragen — für *Singing* Voice
-  Conversion ist das der eigentlich gemeinte Weg. Der Pfad ist eingerichtet und
-  erprobt (`./scripts/setup-inference.sh --with-f0`), kostet aber spürbar mehr
-  Zeit: bei knapp 15 Sekunden Gesang rund 60 Sekunden gegenüber 40 Sekunden im
-  Sprachpfad. Ob er die Voreinstellung werden soll, ist eine Abwägung zwischen
-  Qualität und Durchsatz; angefordert wird er bis dahin je Auftrag mit
-  `f0Condition=true`.
+- **Der Gesangspfad ist die Voreinstellung und kostet Zeit.** `f0_condition`
+  ist standardmäßig an: Die Konvertierung läuft bei 44,1 kHz mit
+  F0-Konditionierung, wodurch die Tonhöhe sauber übertragen wird. Das ist für
+  *Singing* Voice Conversion der gemeinte Weg, kostet aber spürbar mehr Zeit —
+  bei knapp 15 Sekunden Gesang rund 60 statt 40 Sekunden. Wer den schnelleren
+  Sprachpfad braucht, schaltet ihn je Auftrag mit `f0Condition=false` ab. Die
+  zugehörigen Modelle holt `./scripts/setup-inference.sh --with-f0`, das vor dem
+  ersten Einsatz einmal laufen muss.
 - **LaunchAgent braucht eine angemeldete Sitzung.** Metal ist im sessionlosen
   Systemkontext nicht verlässlich nutzbar. Für einen dauerhaft erreichbaren
   Dienst sind automatische Anmeldung und `sudo pmset -a sleep 0 disablesleep 1`
