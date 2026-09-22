@@ -76,6 +76,7 @@ public sealed class FakeUpstream : IAsyncDisposable
 public sealed class GatewayFactory(string upstream) : WebApplicationFactory<Program>
 {
     public const string ClientKey = "client-schluessel";
+    public const string SecondClientKey = "zweiter-schluessel";
     public const string UpstreamKey = "geheimer-mac-schluessel";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -87,6 +88,11 @@ public sealed class GatewayFactory(string upstream) : WebApplicationFactory<Prog
         builder.UseSetting(
             "Gateway:Clients:0:KeySha256", GatewayAuthenticationHandler.ComputeHash(ClientKey));
         builder.UseSetting("Gateway:Clients:0:RequestsPerMinute", "1000");
+
+        builder.UseSetting("Gateway:Clients:1:Name", "zweiter-client");
+        builder.UseSetting(
+            "Gateway:Clients:1:KeySha256", GatewayAuthenticationHandler.ComputeHash(SecondClientKey));
+        builder.UseSetting("Gateway:Clients:1:RequestsPerMinute", "1000");
     }
 
     public HttpClient CreateAuthenticatedClient()
@@ -227,6 +233,23 @@ public class GatewayForwardingTests : IAsyncLifetime
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         _upstream.LastPath.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Mehrere_Aufrufer_werden_getrennt_erkannt()
+    {
+        // Jede Anwendung bekommt einen eigenen Schluessel; nur so laesst sich
+        // ein einzelner Zugang entziehen, ohne die anderen zu stoeren.
+        var zweiter = _factory.CreateClient();
+        zweiter.DefaultRequestHeaders.Add("X-Api-Key", GatewayFactory.SecondClientKey);
+
+        await zweiter.GetAsync("/api/v1/voices");
+
+        _upstream.LastHeaders.GetValueOrDefault("X-Forwarded-Client")
+            .ShouldBe("zweiter-client");
+        // Auch der zweite Aufrufer sieht den Schluessel der API nicht.
+        _upstream.LastHeaders.GetValueOrDefault("X-Api-Key")
+            .ShouldBe(GatewayFactory.UpstreamKey);
     }
 
     public async Task DisposeAsync()

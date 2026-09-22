@@ -1,0 +1,31 @@
+{
+  "//": [
+    "Die Anwendungen, die das Gateway verwenden duerfen.",
+    "",
+    "Kopieren nach deploy/gateway/config/clients.json auf dem Container-Host.",
+    "Die Datei wird nur lesend eingehaengt und im laufenden Betrieb neu",
+    "eingelesen -- ein Neustart ist fuer Aenderungen nicht noetig.",
+    "",
+    "Hinterlegt wird ausschliesslich der Streuwert, nie der Schluessel selbst:",
+    "  printf '%s' 'der-schluessel' | sha256sum | cut -d' ' -f1",
+    "",
+    "Ein eigener Eintrag je Anwendung lohnt sich: Nur so laesst sich ein",
+    "einzelner Zugang entziehen, ohne die anderen zu stoeren, und nur so zeigen",
+    "die Protokolle, wer welchen Auftrag ausgeloest hat."
+  ],
+
+  "Gateway": {
+    "Clients": [
+      {
+        "Name": "verwaltungs-ui",
+        "KeySha256": "HIER-DEN-STREUWERT-EINTRAGEN",
+        "RequestsPerMinute": 120
+      },
+      {
+        "Name": "studio-app",
+        "KeySha256": "HIER-DEN-STREUWERT-EINTRAGEN",
+        "RequestsPerMinute": 60
+      }
+    ]
+  }
+}

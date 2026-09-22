@@ -248,6 +248,18 @@ cp .env.beispiel .env   # Adressen und Schlüssel eintragen
 docker compose pull && docker compose up -d
 ```
 
+## Eine Oberfläche anbinden
+
+Wie eine externe Verwaltungsoberfläche Zugriff bekommt, welche Aufrufe sie
+braucht und womit sie rechnen muss, steht in
+[docs/ui-anbinden.md](docs/ui-anbinden.md). Einen Zugang legt
+
+```bash
+./scripts/neuer-zugang.sh verwaltungs-ui 120
+```
+
+an; der Schlüssel wird einmalig ausgegeben und nirgends gespeichert.
+
 ## Tests
 
 ```bash
