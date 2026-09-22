@@ -56,9 +56,34 @@ builder.Services
             {
                 RouteId = "api",
                 ClusterId = "changemyvoice",
+                // Ohne gueltigen Schluessel kommt hier nichts durch.
+                AuthorizationPolicy = "default",
                 // Der Pfad bleibt unveraendert: Aufrufer und API sprechen
                 // denselben Vertrag.
                 Match = new RouteMatch { Path = "/api/v1/{**catch-all}" },
+            },
+
+            // Die Schnittstellenbeschreibung und ihre Oberflaeche. Bewusst als
+            // eigene Route, damit sie ohne Client-Schluessel erreichbar bleibt:
+            // Ein Browser kann keinen eigenen Kopf mitschicken, und mit
+            // Schluesselpflicht waere die Oberflaeche unbenutzbar. Sie enthaelt
+            // nur die Beschreibung der Endpunkte, keine Daten und keine
+            // Geheimnisse; die Aufrufe daraus brauchen weiterhin einen
+            // gueltigen Schluessel, der in der Oberflaeche unter "Authorize"
+            // hinterlegt wird.
+            new RouteConfig
+            {
+                RouteId = "swagger",
+                ClusterId = "changemyvoice",
+                AuthorizationPolicy = "anonymous",
+                Match = new RouteMatch { Path = "/swagger/{**catch-all}" },
+            },
+            new RouteConfig
+            {
+                RouteId = "openapi",
+                ClusterId = "changemyvoice",
+                AuthorizationPolicy = "anonymous",
+                Match = new RouteMatch { Path = "/openapi/{**catch-all}" },
             },
         ],
         [
@@ -173,7 +198,7 @@ app.MapReverseProxy(proxy => proxy.Use(async (context, next) =>
             Extensions = { ["code"] = "UPSTREAM_UNAVAILABLE" },
         });
     }
-})).RequireAuthorization();
+}));
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }))
     .AllowAnonymous();

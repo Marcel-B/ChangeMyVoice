@@ -60,7 +60,12 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 | `GET` | `/health/live` | Lebenszeichen (ohne Schlüssel) |
 | `GET` | `/health/ready` | Bereitschaft von Modell und Werkzeugen |
 
-Die vollständige Beschreibung liegt unter `/swagger`, der eingecheckte Stand in
+Die vollständige Beschreibung liegt unter `/swagger` — auch über das Gateway,
+und dort bewusst ohne Schlüssel erreichbar: Ein Browser kann keinen eigenen
+Kopf mitschicken, und mit Schlüsselpflicht wäre die Oberfläche unbenutzbar. Sie
+zeigt nur die Beschreibung der Endpunkte; die Aufrufe daraus brauchen weiterhin
+einen gültigen Schlüssel, der in der Oberfläche unter „Authorize" hinterlegt
+wird. Der eingecheckte Stand liegt in
 [docs/openapi/v1.json](docs/openapi/v1.json). Ein Test vergleicht beides: Wer
 einen Endpunkt ändert, ohne den Vertrag nachzuziehen, bekommt einen roten Build.
 

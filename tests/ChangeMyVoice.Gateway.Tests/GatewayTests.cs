@@ -196,6 +196,39 @@ public class GatewayForwardingTests : IAsyncLifetime
         _upstream.LastBodyLength.ShouldBeGreaterThan(payload.Length);
     }
 
+    [Fact]
+    public async Task Die_Schnittstellenbeschreibung_ist_ohne_Schluessel_erreichbar()
+    {
+        // Ein Browser kann keinen eigenen Kopf mitschicken; mit
+        // Schluesselpflicht waere die Oberflaeche unbenutzbar. Sie enthaelt
+        // nur die Beschreibung der Endpunkte, keine Daten.
+        var response = await _factory.CreateClient().GetAsync("/openapi/v1.json");
+
+        response.StatusCode.ShouldNotBe(HttpStatusCode.Unauthorized);
+        _upstream.LastPath.ShouldBe("/openapi/v1.json");
+    }
+
+    [Fact]
+    public async Task Die_Oberflaeche_ist_ohne_Schluessel_erreichbar()
+    {
+        var response = await _factory.CreateClient().GetAsync("/swagger/index.html");
+
+        response.StatusCode.ShouldNotBe(HttpStatusCode.Unauthorized);
+        _upstream.LastPath.ShouldBe("/swagger/index.html");
+    }
+
+    [Fact]
+    public async Task Die_Schnittstellen_bleiben_trotzdem_geschuetzt()
+    {
+        // Die freie Beschreibung darf die Schluesselpflicht der eigentlichen
+        // Aufrufe nicht aufweichen -- genau das waere der Fehler, wenn die
+        // Berechtigung global statt je Route gesetzt wuerde.
+        var response = await _factory.CreateClient().GetAsync("/api/v1/voices");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        _upstream.LastPath.ShouldBeNull();
+    }
+
     public async Task DisposeAsync()
     {
         await _factory.DisposeAsync();
