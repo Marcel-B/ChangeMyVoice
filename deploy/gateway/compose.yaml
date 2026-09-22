@@ -12,7 +12,7 @@
 
 services:
   gateway:
-    image: ghcr.io/${GITHUB_OWNER:-b-velop}/changemyvoice-gateway:latest
+    image: ghcr.io/${GITHUB_OWNER:-marcel-b}/changemyvoice-gateway:latest
     container_name: changemyvoice-gateway
     restart: unless-stopped
     ports:
