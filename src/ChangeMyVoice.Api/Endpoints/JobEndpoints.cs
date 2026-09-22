@@ -33,6 +33,20 @@ internal static class JobEndpoints
             .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
+        group.MapGet("/jobs", ListAsync)
+            .WithName("ListConversionJobs")
+            .WithSummary("Alle Auftraege anzeigen")
+            .WithDescription(
+                "Liefert eine Uebersicht der Auftraege, die juengsten zuerst. Gedacht "
+                + "fuer eine Verwaltungsoberflaeche.\n\n"
+                + "Die Antwort ist seitenweise, weil aufgeraeumte Auftraege als Datensatz "
+                + "erhalten bleiben und die Gesamtzahl damit dauerhaft waechst. Ueber "
+                + "'limit' (1 bis 200, Standard 50) und 'offset' wird geblaettert; 'total' "
+                + "nennt die Gesamtzahl der passenden Auftraege. Mit 'status' laesst sich "
+                + "auf QUEUED, RUNNING, COMPLETED, FAILED oder CANCELLED einschraenken.")
+            .Produces<JobListResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
         group.MapGet("/jobs/{jobId}", GetStatusAsync)
             .WithName("GetJobStatus")
             .WithSummary("Status abfragen")
@@ -118,6 +132,35 @@ internal static class JobEndpoints
         {
             UploadBuffer.Discard(upload);
         }
+    }
+
+    private static async Task<IResult> ListAsync(
+        string? status,
+        int? limit,
+        int? offset,
+        IListConversionJobs useCase,
+        CancellationToken cancellationToken)
+    {
+        if (!ListConversionJobsQuery.TryCreate(status, limit, offset, out var query, out var error))
+        {
+            return TypedResults.Problem(
+                detail: error,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Ungueltige Abfrage",
+                extensions: new Dictionary<string, object?> { ["code"] = "INVALID_INPUT" });
+        }
+
+        var result = await useCase.ExecuteAsync(query, cancellationToken).ConfigureAwait(false);
+
+        if (!result.IsSuccess)
+        {
+            return result.Error!.ToProblem();
+        }
+
+        var page = result.Value!;
+
+        return TypedResults.Ok(new JobListResponse(
+            page.Items.Select(JobResponse.From).ToArray(), page.Total, page.Limit, page.Offset));
     }
 
     private static async Task<IResult> GetStatusAsync(

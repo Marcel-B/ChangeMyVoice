@@ -102,6 +102,17 @@ public sealed record JobResponse(
             char.IsUpper(c) && i > 0 ? "_" + c : c.ToString())).ToUpperInvariant();
 }
 
+/// <summary>Ein Ausschnitt aus der Auftragsliste.</summary>
+/// <param name="Items">Die Aufträge dieser Seite, die jüngsten zuerst.</param>
+/// <param name="Total">Wie viele Aufträge insgesamt zum Filter passen.</param>
+/// <param name="Limit">Die verwendete Seitengröße.</param>
+/// <param name="Offset">Der verwendete Versatz.</param>
+public sealed record JobListResponse(
+    IReadOnlyList<JobResponse> Items,
+    int Total,
+    int Limit,
+    int Offset);
+
 /// <summary>Der Zustand des Dienstes.</summary>
 /// <param name="Status">"healthy" oder "unhealthy".</param>
 /// <param name="Checks">Die einzelnen Prüfungen.</param>

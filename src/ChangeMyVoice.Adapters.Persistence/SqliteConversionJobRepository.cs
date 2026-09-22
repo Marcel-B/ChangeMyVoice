@@ -94,6 +94,37 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ConversionJob>> ListAsync(
+        JobStatus? status, int limit, int offset, CancellationToken cancellationToken = default)
+    {
+        await using var connection = factory.Open();
+
+        // Die juengsten zuerst: Eine Verwaltungsoberflaeche zeigt zuoberst, was
+        // gerade passiert ist, nicht was vor Wochen lief.
+        var rows = await connection.QueryAsync<JobRow>(
+            @"SELECT * FROM conversion_jobs
+              WHERE (@Status IS NULL OR status = @Status)
+              ORDER BY created_at_utc DESC
+              LIMIT @Limit OFFSET @Offset;",
+            new { Status = status?.ToString(), Limit = limit, Offset = offset })
+            .ConfigureAwait(false);
+
+        return rows.Select(r => r.ToDomain()).ToArray();
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountAsync(
+        JobStatus? status, CancellationToken cancellationToken = default)
+    {
+        await using var connection = factory.Open();
+
+        return await connection.ExecuteScalarAsync<int>(
+            @"SELECT COUNT(1) FROM conversion_jobs
+              WHERE (@Status IS NULL OR status = @Status);",
+            new { Status = status?.ToString() }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> HasActiveJobForVoiceAsync(
         VoiceId voiceId, CancellationToken cancellationToken = default)
     {

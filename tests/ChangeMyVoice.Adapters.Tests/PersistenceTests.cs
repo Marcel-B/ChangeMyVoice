@@ -247,3 +247,103 @@ public class SqliteConversionJobRepositoryTests : IDisposable
 
     public void Dispose() => _fixture.Dispose();
 }
+
+public class SqliteJobListingTests : IDisposable
+{
+    private readonly SqliteFixture _fixture = new();
+    private readonly SqliteConversionJobRepository _sut;
+
+    private static readonly DateTimeOffset Start = new(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
+
+    public SqliteJobListingTests() => _sut = new SqliteConversionJobRepository(_fixture.Factory);
+
+    private async Task<ConversionJob> Given(int minute, JobStatus status = JobStatus.Queued)
+    {
+        var at = Start.AddMinutes(minute);
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, at, Guid.NewGuid());
+
+        if (status == JobStatus.Completed)
+        {
+            job.Start(at, Guid.NewGuid());
+            job.Complete(at, 10, "sha");
+        }
+        else if (status == JobStatus.Failed)
+        {
+            job.Fail(at, new JobError(ConversionErrorCode.Timeout, "zu lang"));
+        }
+
+        await _sut.SaveAsync(job);
+        return job;
+    }
+
+    [Fact]
+    public async Task Die_Sortierung_liefert_die_juengsten_zuerst()
+    {
+        // Die Reihenfolge entsteht in SQL; ein Test in der Anwendungsschicht
+        // allein wuerde eine falsche ORDER-BY-Klausel nicht bemerken.
+        await Given(0);
+        await Given(20);
+        var neuester = await Given(40);
+
+        var list = await _sut.ListAsync(null, 10, 0);
+
+        list[0].Id.ShouldBe(neuester.Id);
+        list.Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Seitengroesse_und_Versatz_greifen()
+    {
+        for (var i = 0; i < 6; i++)
+        {
+            await Given(i);
+        }
+
+        var erste = await _sut.ListAsync(null, 2, 0);
+        var dritte = await _sut.ListAsync(null, 2, 4);
+
+        erste.Count.ShouldBe(2);
+        dritte.Count.ShouldBe(2);
+        erste.Select(j => j.Id).ShouldNotBe(dritte.Select(j => j.Id));
+    }
+
+    [Fact]
+    public async Task Der_Zustandsfilter_greift()
+    {
+        await Given(0, JobStatus.Completed);
+        await Given(1, JobStatus.Failed);
+        await Given(2, JobStatus.Completed);
+
+        var fertige = await _sut.ListAsync(JobStatus.Completed, 10, 0);
+
+        fertige.Count.ShouldBe(2);
+        fertige.ShouldAllBe(j => j.Status == JobStatus.Completed);
+    }
+
+    [Fact]
+    public async Task Die_Gesamtzahl_beruecksichtigt_den_Filter()
+    {
+        await Given(0, JobStatus.Completed);
+        await Given(1, JobStatus.Failed);
+        await Given(2, JobStatus.Completed);
+
+        (await _sut.CountAsync(null)).ShouldBe(3);
+        (await _sut.CountAsync(JobStatus.Completed)).ShouldBe(2);
+        (await _sut.CountAsync(JobStatus.Cancelled)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Aufgeraeumte_Auftraege_erscheinen_weiterhin_in_der_Uebersicht()
+    {
+        // Anders als ListUnpurgedAsync, das nur die mit Dateien liefert.
+        var job = await Given(0, JobStatus.Completed);
+        job.MarkArtifactsPurged();
+        await _sut.SaveAsync(job);
+
+        (await _sut.ListAsync(null, 10, 0)).Count.ShouldBe(1);
+        (await _sut.ListUnpurgedAsync()).ShouldBeEmpty();
+    }
+
+    public void Dispose() => _fixture.Dispose();
+}

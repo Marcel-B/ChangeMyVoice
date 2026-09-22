@@ -263,6 +263,60 @@ public class WorkflowTests(ApiFactory factory) : IClassFixture<ApiFactory>
             .ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [SkippableFact]
+    public async Task Die_Auftragsuebersicht_liefert_eine_Seite_mit_Gesamtzahl()
+    {
+        Skip.IfNot(TestAudio.Available, "ffmpeg ist nicht verfügbar.");
+        var client = factory.CreateAuthenticatedClient();
+
+        var created = await client.PostAsync(
+            "/api/v1/voices", VoiceUpload($"Liste-{Guid.NewGuid():n}", TestAudio.Tone()));
+        var voice = await created.Content.ReadFromJsonAsync<ReferenceVoiceResponse>();
+
+        var accepted = await client.PostAsync("/api/v1/jobs", JobUpload(voice!.Id, TestAudio.Tone(5)));
+        var job = await accepted.Content.ReadFromJsonAsync<JobResponse>();
+        await ApiFactory.WaitForTerminalAsync(client, job!.JobId);
+
+        var page = await client.GetFromJsonAsync<JobListResponse>("/api/v1/jobs");
+
+        page.ShouldNotBeNull();
+        page.Items.ShouldContain(j => j.JobId == job.JobId);
+        page.Total.ShouldBeGreaterThan(0);
+        page.Limit.ShouldBe(50);
+        page.Offset.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Die_Auftragsuebersicht_verlangt_einen_Schluessel()
+    {
+        var response = await factory.CreateClient().GetAsync("/api/v1/jobs");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData("?limit=0")]
+    [InlineData("?limit=500")]
+    [InlineData("?offset=-1")]
+    [InlineData("?status=gibtsnicht")]
+    public async Task Unsinnige_Abfragen_werden_mit_400_beantwortet(string query)
+    {
+        var response = await factory.CreateAuthenticatedClient().GetAsync($"/api/v1/jobs{query}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Die_Uebersicht_laesst_sich_auf_einen_Zustand_einschraenken()
+    {
+        var page = await factory.CreateAuthenticatedClient()
+            .GetFromJsonAsync<JobListResponse>("/api/v1/jobs?status=COMPLETED&limit=5");
+
+        page.ShouldNotBeNull();
+        page.Items.ShouldAllBe(j => j.Status == "COMPLETED");
+        page.Limit.ShouldBe(5);
+    }
+
     [Fact]
     public async Task Ein_zu_grosser_Upload_wird_abgewiesen()
     {
