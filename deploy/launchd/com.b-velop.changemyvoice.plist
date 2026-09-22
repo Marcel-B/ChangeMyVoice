@@ -39,10 +39,15 @@
         <string>Production</string>
         <key>ASPNETCORE_ENVIRONMENT</key>
         <string>Production</string>
-        <!-- Bewusst nicht 0.0.0.0: Erreichbar sein soll der Dienst nur dort,
-             wo auch das Gateway ankommt. -->
+        <!-- Gebunden wird ausschliesslich an die Tailscale-Adresse dieses
+             Rechners. Damit ist der Dienst im lokalen Netz gar nicht sichtbar
+             und ausschliesslich ueber das Tailnet erreichbar. Die Adresse
+             steht fest, sie ist an den Knoten gebunden:
+               tailscale ip -4
+             Ein Bindfehler beim Start bedeutet, dass Tailscale noch nicht
+             verbunden ist. -->
         <key>ASPNETCORE_URLS</key>
-        <string>http://127.0.0.1:5080</string>
+        <string>http://100.93.85.52:5080</string>
         <key>CHANGEMYVOICE_CONFIG_DIR</key>
         <string>/Users/marcel/.config/changemyvoice</string>
     </dict>

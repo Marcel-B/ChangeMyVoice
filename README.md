@@ -178,6 +178,52 @@ cp deploy/launchd/com.b-velop.changemyvoice.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.b-velop.changemyvoice.plist
 ```
 
+### Betrieb über Tailscale
+
+Der Mac und der Gateway-Container sind Knoten desselben Tailnets; dazwischen
+liegt kein offener Port im lokalen Netz.
+
+```text
+Client ──► voice.idsrv.info
+             │  (Reverse Proxy im LAN)
+             ▼
+           CT "voice" auf Proxmox        Tailscale-Knoten
+             │  Client-Schlüssel  →  Schlüssel der API
+             ▼  über das Tailnet
+           mac-mini-von-marcel:5080      Tailscale-Knoten
+```
+
+Drei Punkte hängen zusammen und müssen zueinander passen:
+
+1. **Die API bindet an ihre Tailscale-Adresse**, nicht an `127.0.0.1` und nicht
+   an `0.0.0.0`. Damit ist sie im lokalen Netz unsichtbar und ausschließlich
+   über das Tailnet erreichbar. Die Adresse steht in der launchd-Einheit und
+   lässt sich mit `tailscale ip -4` ermitteln.
+2. **Die Freigabeliste enthält die Tailscale-Adresse des Containers** — eine
+   einzelne Adresse, nicht der ganze Tailnet-Bereich. Sonst könnte jedes Gerät
+   im Tailnet die API direkt ansprechen und das Gateway umgehen, was die
+   Vorgabe „Aufträge nur über das Gateway" gerade aushebeln würde.
+3. **Das Gateway spricht den MagicDNS-Namen an**, nicht die IP-Adresse. Der
+   Name bleibt gültig, falls der Knoten je eine andere Adresse bekommt.
+
+Einrichten des Containers:
+
+```bash
+# im CT, nach der Docker-Installation
+tailscale up                 # Knoten anmelden
+tailscale ip -4              # diese Adresse in die Freigabeliste des Macs
+
+mkdir -p /opt/changemyvoice-gateway && cd /opt/changemyvoice-gateway
+curl -fsSLO https://raw.githubusercontent.com/Marcel-B/ChangeMyVoice/main/deploy/gateway/compose.yaml
+curl -fsSL  https://raw.githubusercontent.com/Marcel-B/ChangeMyVoice/main/deploy/gateway/.env.beispiel -o .env
+# .env ausfüllen, dann:
+docker compose pull && docker compose up -d
+```
+
+Ein Anmelden an der Registry ist nicht nötig, das Abbild ist öffentlich
+abrufbar. In einem LXC-Container braucht Docker `nesting=1` in der
+Container-Konfiguration.
+
 Das Gateway ist zustandslos — es haelt weder Auftraege noch Dateien; die
 Ergebnisse liegen alle auf dem Mac. Ein Neustart des Containers verliert daher
 nichts, und er kommt mit wenig aus: 256 bis 512 MB Arbeitsspeicher und eine
