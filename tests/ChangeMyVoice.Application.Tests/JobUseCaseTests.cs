@@ -54,7 +54,7 @@ public class SubmitConversionJobTests
     }
 
     [Fact]
-    public async Task Ohne_F0_Konditionierung_wird_auf_22050_Hz_normalisiert()
+    public async Task In_der_Voreinstellung_wird_auf_44100_Hz_normalisiert()
     {
         var voiceId = await GivenVoice();
 
@@ -64,19 +64,20 @@ public class SubmitConversionJobTests
         // Genau die Rate, die librosa im Python-Lauf ohnehin verwenden wird —
         // damit wird kein zweites Mal resampelt.
         _normalizer.Calls.Count.ShouldBe(2);
-        _normalizer.Calls.ShouldAllBe(c => c.SampleRate == 22050);
+        _normalizer.Calls.ShouldAllBe(c => c.SampleRate == 44100);
     }
 
     [Fact]
-    public async Task Mit_F0_Konditionierung_wird_auf_44100_Hz_normalisiert()
+    public async Task Im_Sprachpfad_wird_auf_22050_Hz_normalisiert()
     {
         var voiceId = await GivenVoice();
-        ConversionOptions.TryCreate(null, null, null, f0Condition: true, null, out var options, out _)
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, out var options, out _)
             .ShouldBeTrue();
 
         await Sut().ExecuteAsync(new SubmitConversionJobCommand(voiceId, Upload, options));
 
-        _normalizer.Calls.ShouldAllBe(c => c.SampleRate == 44100);
+        _normalizer.Calls.Count.ShouldBe(2);
+        _normalizer.Calls.ShouldAllBe(c => c.SampleRate == 22050);
     }
 
     [Fact]

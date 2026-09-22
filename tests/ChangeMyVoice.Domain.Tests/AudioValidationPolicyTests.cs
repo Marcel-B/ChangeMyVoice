@@ -145,8 +145,20 @@ public class TargetAudioFormatTests
     }
 
     [Fact]
-    public void Die_Optionen_leiten_das_Zielformat_selbst_ab()
+    public void Die_Voreinstellung_ist_der_Gesangspfad()
     {
-        ConversionOptions.Default.TargetFormat.SampleRate.ShouldBe(22050);
+        // Der Dienst ist fuer Gesang gedacht; ohne F0-Konditionierung klingt
+        // das Ergebnis eher nach Sprachumwandlung.
+        ConversionOptions.Default.F0Condition.ShouldBeTrue();
+        ConversionOptions.Default.TargetFormat.SampleRate.ShouldBe(44100);
+    }
+
+    [Fact]
+    public void Der_Sprachpfad_laesst_sich_ausdruecklich_waehlen()
+    {
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null,
+            out var options, out _).ShouldBeTrue();
+
+        options.TargetFormat.SampleRate.ShouldBe(22050);
     }
 }
