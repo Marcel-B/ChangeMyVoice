@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Betrieb der API als Dienst auf dem Mac.
+
+  Einrichten:
+    dotnet publish src/ChangeMyVoice.Api -c Release -r osx-arm64 \
+        --self-contained false -o ~/Applications/ChangeMyVoice
+    cp deploy/launchd/com.b-velop.changemyvoice.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.b-velop.changemyvoice.plist
+
+  Bewusst ein LaunchAgent und kein LaunchDaemon: Die Inferenz braucht Metal und
+  damit eine angemeldete Sitzung; ausserdem liegen venv, Modell-Zwischenspeicher
+  und Checkpoints im Benutzerverzeichnis. Fuer einen dauerhaft erreichbaren
+  Dienst muessen daher die automatische Anmeldung aktiviert und der
+  Ruhezustand unterdrueckt sein:
+
+    sudo pmset -a sleep 0 disablesleep 1
+
+  Der Zugangsschluessel steht NICHT hier, sondern in
+  ~/.config/changemyvoice/appsettings.Production.json mit chmod 600 —
+  Umgebungsvariablen einer plist sind ueber `launchctl print` einsehbar.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.b-velop.changemyvoice</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/marcel/Applications/ChangeMyVoice/ChangeMyVoice.Api</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/marcel/Applications/ChangeMyVoice</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DOTNET_ENVIRONMENT</key>
+        <string>Production</string>
+        <key>ASPNETCORE_ENVIRONMENT</key>
+        <string>Production</string>
+        <!-- Bewusst nicht 0.0.0.0: Erreichbar sein soll der Dienst nur dort,
+             wo auch das Gateway ankommt. -->
+        <key>ASPNETCORE_URLS</key>
+        <string>http://127.0.0.1:5080</string>
+        <key>CHANGEMYVOICE_CONFIG_DIR</key>
+        <string>/Users/marcel/.config/changemyvoice</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Ein geordnetes Beenden soll nicht sofort neu starten, ein Absturz
+             dagegen schon. -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Kein Neustartsturm, falls der Dienst wegen einer fehlenden
+         Einstellung gar nicht erst hochkommt. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Verhindert, dass macOS den Prozess in der Leistung drosselt; die
+         Inferenz braucht die volle Rechenleistung. -->
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/marcel/Library/Logs/ChangeMyVoice/dienst.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/marcel/Library/Logs/ChangeMyVoice/fehler.log</string>
+</dict>
+</plist>

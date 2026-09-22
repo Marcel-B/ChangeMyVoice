@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ChangeMyVoice.Adapters.Inference/ChangeMyVoice.Adapters.Inference.csproj" />
+    <Project Path="src/ChangeMyVoice.Adapters.Persistence/ChangeMyVoice.Adapters.Persistence.csproj" />
+    <Project Path="src/ChangeMyVoice.Adapters.Storage/ChangeMyVoice.Adapters.Storage.csproj" />
+    <Project Path="src/ChangeMyVoice.Api/ChangeMyVoice.Api.csproj" />
+    <Project Path="src/ChangeMyVoice.Application/ChangeMyVoice.Application.csproj" />
+    <Project Path="src/ChangeMyVoice.Domain/ChangeMyVoice.Domain.csproj" />
+    <Project Path="src/ChangeMyVoice.Gateway/ChangeMyVoice.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ChangeMyVoice.Adapters.Tests/ChangeMyVoice.Adapters.Tests.csproj" />
+    <Project Path="tests/ChangeMyVoice.Api.IntegrationTests/ChangeMyVoice.Api.IntegrationTests.csproj" />
+    <Project Path="tests/ChangeMyVoice.Application.Tests/ChangeMyVoice.Application.Tests.csproj" />
+    <Project Path="tests/ChangeMyVoice.Domain.Tests/ChangeMyVoice.Domain.Tests.csproj" />
+    <Project Path="tests/ChangeMyVoice.Gateway.Tests/ChangeMyVoice.Gateway.Tests.csproj" />
+  </Folder>
+</Solution>

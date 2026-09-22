@@ -1,0 +1,976 @@
+{
+  "components": {
+    "schemas": {
+      "AudioPropertiesResponse": {
+        "description": "Die Eigenschaften einer Audioaufnahme.",
+        "properties": {
+          "channels": {
+            "description": "Die Anzahl der Kanäle.",
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "codec": {
+            "description": "Der Codec, etwa `pcm_s16le` oder `mp3`.",
+            "type": "string"
+          },
+          "durationSeconds": {
+            "description": "Die Spieldauer in Sekunden.",
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "sampleRate": {
+            "description": "Die Abtastrate in Hertz.",
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "codec",
+          "durationSeconds",
+          "sampleRate",
+          "channels"
+        ],
+        "type": "object"
+      },
+      "HealthCheckResponse": {
+        "description": "Eine einzelne Bereitschaftsprüfung.",
+        "properties": {
+          "detail": {
+            "description": "Eine knappe Erläuterung, falls nicht.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "healthy": {
+            "description": "Ob sie bestanden wurde.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Der Name der Prüfung.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "healthy",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Der Zustand des Dienstes.",
+        "properties": {
+          "checks": {
+            "description": "Die einzelnen Prüfungen.",
+            "items": {
+              "$ref": "#/components/schemas/HealthCheckResponse"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "\"healthy\" oder \"unhealthy\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checks"
+        ],
+        "type": "object"
+      },
+      "IFormFile": {
+        "format": "binary",
+        "type": "string"
+      },
+      "IResult": {
+        "type": "object"
+      },
+      "JobErrorResponse": {
+        "description": "Die Fehlerursache eines Auftrags.",
+        "properties": {
+          "code": {
+            "description": "Der Fehlercode.",
+            "type": "string"
+          },
+          "message": {
+            "description": "Eine kurze Begründung.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "JobResponse": {
+        "description": "Der Zustand eines Konvertierungsauftrags.",
+        "properties": {
+          "createdAtUtc": {
+            "description": "Zeitpunkt der Annahme.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JobErrorResponse",
+                "description": "Die Ursache, falls der Auftrag fehlgeschlagen ist."
+              }
+            ]
+          },
+          "finishedAtUtc": {
+            "description": "Zeitpunkt des Endes.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jobId": {
+            "description": "Die Kennung.",
+            "type": "string"
+          },
+          "resultSha256": {
+            "description": "Die Prüfsumme der Ergebnisdatei, damit ein abgebrochener Abruf erkennbar ist.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resultSizeBytes": {
+            "description": "Die Größe der Ergebnisdatei.",
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "resultUrl": {
+            "description": "Wo das Ergebnis abgeholt werden kann, sobald es bereitsteht.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAtUtc": {
+            "description": "Zeitpunkt des Beginns.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "description": "Der Zustand: QUEUED, RUNNING, COMPLETED, FAILED oder CANCELLED.",
+            "type": "string"
+          },
+          "voiceId": {
+            "description": "Die verwendete Referenzstimme.",
+            "type": "string"
+          },
+          "voiceLabel": {
+            "description": "Deren Bezeichnung bei Annahme des Auftrags.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "voiceId",
+          "voiceLabel",
+          "createdAtUtc",
+          "startedAtUtc",
+          "finishedAtUtc",
+          "error",
+          "resultUrl",
+          "resultSizeBytes",
+          "resultSha256"
+        ],
+        "type": "object"
+      },
+      "ProblemDetails": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ReferenceVoiceResponse": {
+        "description": "Eine gespeicherte Referenzstimme.",
+        "properties": {
+          "createdAtUtc": {
+            "description": "Zeitpunkt der Anlage.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Die Kennung, mit der sie bei einem Auftrag angegeben wird.",
+            "type": "string"
+          },
+          "label": {
+            "description": "Die Bezeichnung.",
+            "type": "string"
+          },
+          "original": {
+            "$ref": "#/components/schemas/AudioPropertiesResponse",
+            "description": "Die Eigenschaften der hochgeladenen Datei. Daran ist erkennbar, ob das\nAusgangsmaterial für ein gutes Ergebnis taugt."
+          },
+          "stored": {
+            "$ref": "#/components/schemas/AudioPropertiesResponse",
+            "description": "Die Eigenschaften der abgelegten Datei — stets mono, PCM und 44,1 kHz."
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "createdAtUtc",
+          "stored",
+          "original"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "ApiKey": {
+        "description": "Der Zugangsschlüssel. Anfragen werden ausschließlich über das Gateway angenommen, das diesen Schlüssel setzt.",
+        "in": "header",
+        "name": "X-Api-Key",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "Schnittstelle für Singing Voice Conversion: Eine Gesangsaufnahme behält ihre Melodie, Phrasierung und Darbietung, übernimmt aber das Timbre einer gespeicherten Referenzstimme. Die Verarbeitung läuft im Hintergrund — ein Auftrag wird angenommen, sein Fortschritt abgefragt und das Ergebnis anschließend heruntergeladen.",
+    "title": "ChangeMyVoice",
+    "version": "v1"
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/api/v1/jobs": {
+      "post": {
+        "description": "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt erhalten, das Timbre stammt aus der Referenz.",
+        "operationId": "SubmitConversionJob",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "voiceId": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "source": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "diffusionSteps": {
+                        "format": "int32",
+                        "pattern": "^-?(?:0|[1-9]\\d*)$",
+                        "type": [
+                          "integer",
+                          "string"
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "inferenceCfgRate": {
+                        "format": "double",
+                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+                        "type": [
+                          "number",
+                          "string"
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "lengthAdjust": {
+                        "format": "double",
+                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+                        "type": [
+                          "number",
+                          "string"
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "f0Condition": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "fp16": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "required": [
+                  "voiceId",
+                  "source"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Payload Too Large"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Stimme zur Änderung senden",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/api/v1/jobs/{jobId}": {
+      "delete": {
+        "description": "Bricht einen Auftrag ab und entfernt seine Arbeitsdateien sofort, statt auf den regelmäßigen Aufräumlauf zu warten. Der Aufruf ist wiederholbar.",
+        "operationId": "CancelJob",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Auftrag abbrechen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      },
+      "get": {
+        "description": "Liefert den Zustand eines Auftrags. Steht das Ergebnis bereit, enthält die Antwort zusätzlich die Abrufadresse sowie Größe und Prüfsumme der Datei.",
+        "operationId": "GetJobStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Status abfragen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/api/v1/jobs/{jobId}/result": {
+      "get": {
+        "description": "Liefert die konvertierte Aufnahme als WAV. Der Abruf ist wiederholbar; die Datei wird erst nach Ablauf der Aufbewahrungsfrist entfernt.",
+        "operationId": "GetJobResult",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "$ref": "#/components/schemas/IResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Gone"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Ergebnis herunterladen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/api/v1/voices": {
+      "get": {
+        "description": "Liefert alle gespeicherten Referenzstimmen mit ihrer Bezeichnung.",
+        "operationId": "ListReferenceVoices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceVoiceResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Alle Referenzstimmen anzeigen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      },
+      "post": {
+        "description": "Nimmt eine Aufnahme der Zielstimme entgegen und legt sie dauerhaft ab. Angenommen werden WAV, MP3, FLAC, M4A/AAC und OGG/Opus; die Datei wird geprüft und intern als Mono-PCM-WAV mit 44,1 kHz gespeichert. Aufnahmen über 25 Sekunden werden gekürzt, weil das Modell ohnehin nur diesen Anfang verwendet.",
+        "operationId": "AddReferenceVoice",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "required": [
+                  "label",
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceVoiceResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Payload Too Large"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Referenzstimme senden",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/api/v1/voices/{voiceId}": {
+      "delete": {
+        "description": "Entfernt eine Referenzstimme samt ihrer Audiodatei. Solange noch ein Auftrag auf sie wartet oder läuft, wird das Löschen abgelehnt.",
+        "operationId": "DeleteReferenceVoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "voiceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Referenzstimme löschen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      },
+      "get": {
+        "description": "Liefert eine einzelne Referenzstimme samt der Eigenschaften der ursprünglich hochgeladenen Datei.",
+        "operationId": "GetReferenceVoice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "voiceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceVoiceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Einzelne Referenzstimme abrufen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "description": "Meldet, dass der Dienst antwortet. Bewusst ohne Zugangsschlüssel, damit die Dienstüberwachung ihn abfragen kann, und ohne Angaben zur Umgebung.",
+        "operationId": "HealthLive",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Lebenszeichen",
+        "tags": [
+          "Betrieb"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Meldet, ob Modell, Python-Umgebung und Audiowerkzeuge verfügbar sind. Schlägt eine Prüfung fehl, ist das früh sichtbar statt erst beim ersten Auftrag.",
+        "operationId": "HealthReady",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Bereitschaft prüfen",
+        "tags": [
+          "Betrieb"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5099/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Betrieb"
+    },
+    {
+      "name": "ChangeMyVoice"
+    }
+  ]
+}
