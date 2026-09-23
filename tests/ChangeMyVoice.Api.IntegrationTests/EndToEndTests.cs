@@ -135,7 +135,7 @@ public class OpenApiContractTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         var expected = new[]
         {
-            "/api/v1/voices", "/api/v1/voices/{voiceId}",
+            "/api/v1/voices", "/api/v1/voices/{voiceId}", "/api/v1/voices/{voiceId}/audio",
             "/api/v1/jobs", "/api/v1/jobs/{jobId}", "/api/v1/jobs/{jobId}/result",
             "/health/live", "/health/ready",
         };

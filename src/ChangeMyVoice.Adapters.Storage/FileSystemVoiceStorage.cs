@@ -42,6 +42,25 @@ public sealed class FileSystemVoiceStorage : IVoiceStorage
     public bool MasterExists(VoiceId id) => File.Exists(PathFor(id));
 
     /// <inheritdoc />
+    public Task<Stream?> OpenMasterAsync(VoiceId id, CancellationToken cancellationToken = default)
+    {
+        var path = PathFor(id);
+
+        if (!File.Exists(path))
+        {
+            return Task.FromResult<Stream?>(null);
+        }
+
+        // Zum Lesen freigegeben, damit ein Auftrag, der die Stimme gerade
+        // kopiert, nicht auf den Abruf warten muss.
+        Stream stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 64 * 1024, useAsync: true);
+
+        return Task.FromResult<Stream?>(stream);
+    }
+
+    /// <inheritdoc />
     public Task DeleteAsync(VoiceId id, CancellationToken cancellationToken = default)
     {
         var directory = DirectoryFor(id);

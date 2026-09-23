@@ -89,6 +89,7 @@ builder.Services.AddHttpClient("changemyvoice", client =>
 | --- | --- |
 | Stimmen anzeigen | `GET /api/v1/voices` |
 | Stimme anlegen | `POST /api/v1/voices` (multipart: `label`, `file`) |
+| Stimme nachhören | `GET /api/v1/voices/{id}/audio` (der abgelegte Master als WAV) |
 | Stimme löschen | `DELETE /api/v1/voices/{id}` |
 | Übersicht der Aufträge | `GET /api/v1/jobs?limit=50&offset=0` |
 | Nur laufende zeigen | `GET /api/v1/jobs?status=RUNNING` |

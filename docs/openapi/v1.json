@@ -1047,6 +1047,67 @@
         ]
       }
     },
+    "/api/v1/voices/{voiceId}/audio": {
+      "get": {
+        "description": "Liefert die abgelegte Aufnahme als WAV: Mono-PCM mit 44,1 kHz, höchstens 25 Sekunden — genau das, was das Modell von der Stimme bekommt. Damit lässt sich eine Stimme nachhören, bevor ein Auftrag auf ihr rechnet. Die ursprünglich hochgeladene Datei wird nicht aufbewahrt.",
+        "operationId": "GetReferenceVoiceAudio",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "voiceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "$ref": "#/components/schemas/IResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Aufnahme einer Referenzstimme herunterladen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "description": "Meldet, dass der Dienst antwortet. Bewusst ohne Zugangsschlüssel, damit die Dienstüberwachung ihn abfragen kann, und ohne Angaben zur Umgebung.",

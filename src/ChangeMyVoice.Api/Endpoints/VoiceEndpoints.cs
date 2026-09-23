@@ -43,6 +43,18 @@ internal static class VoiceEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/voices/{voiceId}/audio", GetAudioAsync)
+            .WithName("GetReferenceVoiceAudio")
+            .WithSummary("Aufnahme einer Referenzstimme herunterladen")
+            .WithDescription(
+                "Liefert die abgelegte Aufnahme als WAV: Mono-PCM mit 44,1 kHz, höchstens "
+                + "25 Sekunden — genau das, was das Modell von der Stimme bekommt. Damit lässt "
+                + "sich eine Stimme nachhören, bevor ein Auftrag auf ihr rechnet. Die "
+                + "ursprünglich hochgeladene Datei wird nicht aufbewahrt.")
+            .Produces<IResult>(StatusCodes.Status200OK, "audio/wav")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapDelete("/voices/{voiceId}", DeleteAsync)
             .WithName("DeleteReferenceVoice")
             .WithSummary("Referenzstimme löschen")
@@ -105,6 +117,28 @@ internal static class VoiceEndpoints
         return result.IsSuccess
             ? TypedResults.Ok(ReferenceVoiceResponse.From(result.Value!))
             : result.Error!.ToProblem();
+    }
+
+    private static async Task<IResult> GetAudioAsync(
+        string voiceId, IGetReferenceVoiceAudio useCase, CancellationToken cancellationToken)
+    {
+        if (!VoiceId.TryParse(voiceId, out var id))
+        {
+            return InvalidIdentifier("Referenzstimme");
+        }
+
+        var result = await useCase.ExecuteAsync(id, cancellationToken).ConfigureAwait(false);
+
+        if (!result.IsSuccess)
+        {
+            return result.Error!.ToProblem();
+        }
+
+        return TypedResults.Stream(
+            result.Value!.Content,
+            contentType: "audio/wav",
+            fileDownloadName: result.Value.FileName,
+            enableRangeProcessing: true);
     }
 
     private static async Task<IResult> DeleteAsync(

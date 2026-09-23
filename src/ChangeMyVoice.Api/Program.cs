@@ -106,6 +106,7 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddScoped<IAddReferenceVoice, AddReferenceVoice>();
 builder.Services.AddScoped<IListReferenceVoices, ListReferenceVoices>();
 builder.Services.AddScoped<IGetReferenceVoice, GetReferenceVoice>();
+builder.Services.AddScoped<IGetReferenceVoiceAudio, GetReferenceVoiceAudio>();
 builder.Services.AddScoped<IDeleteReferenceVoice, DeleteReferenceVoice>();
 builder.Services.AddScoped<ISubmitConversionJob, SubmitConversionJob>();
 builder.Services.AddScoped<IListConversionJobs, ListConversionJobs>();
