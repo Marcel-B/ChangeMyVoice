@@ -41,7 +41,10 @@ lässt er sich nicht zurückrechnen. Geht er verloren, wird ein neuer erzeugt.
 
 ## 2. Eintragen
 
-Auf dem Container-Host, in `/opt/changemyvoice-gateway/config/clients.json`:
+Auf dem Container-Host, in `/opt/changemyvoice-gateway/config/clients.json`.
+Der Dateiname lautet **`clients.json`** mit s, und der Rahmen mit `Gateway` und
+`Clients` gehört dazu — ein einzelnes Objekt allein wird nicht erkannt, und der
+Dienst startet dann nicht:
 
 ```json
 {
