@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using ChangeMyVoice.Api.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 namespace ChangeMyVoice.Api.IntegrationTests;
@@ -219,5 +220,40 @@ public class OpenApiContractTests(ApiFactory factory) : IClassFixture<ApiFactory
                 summary.GetString().ShouldNotBeNullOrWhiteSpace();
             }
         }
+    }
+}
+
+public class UploadLimitTests(ApiFactory factory) : IClassFixture<ApiFactory>
+{
+    [Fact]
+    public void Beide_Upload_Grenzen_stimmen_ueberein()
+    {
+        // Zwei Grenzen muessen zusammenpassen: FormOptions begrenzt den
+        // Multipart-Inhalt, Kestrel den Rumpf der Anfrage insgesamt. Fehlt die
+        // zweite, greift deren Standardwert von 30 MB -- der Upload bricht dann
+        // mitten im Uebertragen ab, obwohl die Einstellung viel mehr erlaubt.
+        // Genau das ist im Betrieb passiert: Referenzstimmen gingen durch,
+        // laengere Gesangsaufnahmen nicht.
+        var form = factory.Services
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Microsoft.AspNetCore.Http.Features.FormOptions>>().Value;
+
+        var kestrel = factory.Services
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>>().Value;
+
+        kestrel.Limits.MaxRequestBodySize.ShouldBe(form.MultipartBodyLengthLimit,
+            "Kestrel wuerde den Upload sonst frueher abbrechen als vorgesehen.");
+    }
+
+    [Fact]
+    public void Die_Grenze_folgt_der_Einstellung_und_nicht_dem_Standardwert()
+    {
+        var kestrel = factory.Services
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>>().Value;
+
+        // Die Testfabrik stellt 5 MB ein; der Standardwert waere 30 MB.
+        kestrel.Limits.MaxRequestBodySize.ShouldBe(5 * 1024 * 1024);
     }
 }
