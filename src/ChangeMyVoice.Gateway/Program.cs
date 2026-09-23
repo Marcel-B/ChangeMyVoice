@@ -46,7 +46,11 @@ builder.Services.AddOptions<GatewayOptions>()
     .ValidateDataAnnotations()
     .Validate(
         options => options.Clients.Count > 0,
-        "Ohne hinterlegten Zugangsschlüssel würde das Gateway ungeschützt laufen.")
+        "Ohne hinterlegten Zugangsschlüssel würde das Gateway ungeschützt laufen. "
+        + "Erwartet wird mindestens ein Eintrag unter Gateway:Clients — entweder in "
+        + "der eingehängten Datei /app/config/clients.json oder über die "
+        + "Umgebungsvariablen Gateway__Clients__0__Name und "
+        + "Gateway__Clients__0__KeySha256.")
     .ValidateOnStart();
 
 var gateway = builder.Configuration

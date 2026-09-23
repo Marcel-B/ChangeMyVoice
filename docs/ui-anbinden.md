@@ -54,8 +54,11 @@ Auf dem Container-Host, in `/opt/changemyvoice-gateway/config/clients.json`:
 }
 ```
 
-Die Datei wird im laufenden Betrieb neu eingelesen — ein Neustart des
-Containers ist für Änderungen nicht nötig.
+Das Verzeichnis `config/` muss existieren, weil die compose-Datei es einhängt —
+leer sein darf es. Ein erster Aufrufer kommt bereits aus den
+Umgebungsvariablen, damit das Gateway auch ohne diese Datei startet.
+
+Änderungen werden im laufenden Betrieb übernommen.
 
 Ein eigener Eintrag je Anwendung lohnt sich: Nur so lässt sich ein einzelner
 Zugang entziehen, ohne die anderen zu stören, und nur so zeigen die Protokolle,
