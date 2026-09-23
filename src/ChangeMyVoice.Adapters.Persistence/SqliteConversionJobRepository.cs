@@ -22,13 +22,13 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 diffusion_steps, inference_cfg_rate, length_adjust, f0_condition, fp16,
                 created_at_utc, started_at_utc, finished_at_utc, downloaded_at_utc,
                 error_code, error_message, output_size_bytes, output_sha256,
-                instance_id, inference_process_id, artifacts_purged)
+                instance_id, inference_process_id, artifacts_purged, source_length_ms)
             VALUES (
                 @Id, @VoiceId, @VoiceLabel, @Status,
                 @DiffusionSteps, @InferenceCfgRate, @LengthAdjust, @F0Condition, @Fp16,
                 @CreatedAt, @StartedAt, @FinishedAt, @DownloadedAt,
                 @ErrorCode, @ErrorMessage, @OutputSize, @OutputSha,
-                @InstanceId, @ProcessId, @Purged)
+                @InstanceId, @ProcessId, @Purged, @SourceLength)
             ON CONFLICT(id) DO UPDATE SET
                 status = excluded.status,
                 started_at_utc = excluded.started_at_utc,
@@ -64,6 +64,7 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 InstanceId = job.InstanceId.ToString(),
                 ProcessId = job.InferenceProcessId,
                 Purged = job.ArtifactsPurged ? 1 : 0,
+                SourceLength = (long)job.SourceLength.TotalMilliseconds,
             }).ConfigureAwait(false);
     }
 
@@ -170,6 +171,7 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
         public string Instance_Id { get; init; } = string.Empty;
         public long? Inference_Process_Id { get; init; }
         public long Artifacts_Purged { get; init; }
+        public long Source_Length_Ms { get; init; }
 
         public ConversionJob ToDomain()
         {
@@ -199,7 +201,8 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 Output_Sha256,
                 Guid.Parse(Instance_Id),
                 (int?)Inference_Process_Id,
-                Artifacts_Purged != 0);
+                Artifacts_Purged != 0,
+                TimeSpan.FromMilliseconds(Source_Length_Ms));
         }
 
         private static DateTimeOffset? Parse(string? value) =>

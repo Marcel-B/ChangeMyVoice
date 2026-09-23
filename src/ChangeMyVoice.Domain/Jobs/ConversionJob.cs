@@ -1,3 +1,4 @@
+using ChangeMyVoice.Domain.Audio;
 using ChangeMyVoice.Domain.Common;
 using ChangeMyVoice.Domain.Voices;
 
@@ -81,6 +82,20 @@ public sealed class ConversionJob
     /// <summary>Die gewählten Stellschrauben.</summary>
     public ConversionOptions Options { get; }
 
+    /// <summary>
+    /// Die Länge der Quellaufnahme. Festgehalten, damit sich die voraussichtliche
+    /// Rechenzeit auch nach einem Neustart noch angeben lässt.
+    /// </summary>
+    public TimeSpan SourceLength { get; private init; }
+
+    /// <summary>
+    /// Wie lange die Konvertierung voraussichtlich dauert. Eine Orientierung für
+    /// aufrufende Oberflächen, keine Zusage — bei Laufzeiten von einer Stunde ist
+    /// die Angabe wichtiger als bei wenigen Sekunden.
+    /// </summary>
+    public TimeSpan EstimatedDuration => ConversionDurationEstimate.For(
+        SourceLength, Options.DiffusionSteps, Options.F0Condition);
+
     /// <summary>Der aktuelle Zustand.</summary>
     public JobStatus Status { get; private set; }
 
@@ -137,8 +152,12 @@ public sealed class ConversionJob
         string voiceLabel,
         ConversionOptions options,
         DateTimeOffset createdAtUtc,
-        Guid instanceId) =>
-        new(id, voiceId, voiceLabel, options, createdAtUtc, instanceId);
+        Guid instanceId,
+        TimeSpan sourceLength = default) =>
+        new(id, voiceId, voiceLabel, options, createdAtUtc, instanceId)
+        {
+            SourceLength = sourceLength,
+        };
 
     /// <summary>Stellt einen gespeicherten Auftrag wieder her.</summary>
     public static ConversionJob Rehydrate(
@@ -156,10 +175,14 @@ public sealed class ConversionJob
         string? outputSha256,
         Guid instanceId,
         int? inferenceProcessId,
-        bool artifactsPurged) =>
+        bool artifactsPurged,
+        TimeSpan sourceLength = default) =>
         new(id, voiceId, voiceLabel, options, status, createdAtUtc, startedAtUtc, finishedAtUtc,
             downloadedAtUtc, error, outputSizeBytes, outputSha256, instanceId, inferenceProcessId,
-            artifactsPurged);
+            artifactsPurged)
+        {
+            SourceLength = sourceLength,
+        };
 
     /// <summary>Beginnt die Berechnung.</summary>
     public void Start(DateTimeOffset atUtc, Guid instanceId)

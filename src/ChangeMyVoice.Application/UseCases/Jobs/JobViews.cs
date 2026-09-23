@@ -15,6 +15,8 @@ namespace ChangeMyVoice.Application.UseCases.Jobs;
 /// <param name="OutputSizeBytes">Größe der Ergebnisdatei.</param>
 /// <param name="OutputSha256">Prüfsumme der Ergebnisdatei.</param>
 /// <param name="IsResultAvailable">Ob das Ergebnis abgerufen werden kann.</param>
+/// <param name="SourceLength">Die Länge der Quellaufnahme.</param>
+/// <param name="EstimatedDuration">Voraussichtliche Rechenzeit.</param>
 public sealed record ConversionJobView(
     JobId Id,
     VoiceId VoiceId,
@@ -26,11 +28,13 @@ public sealed record ConversionJobView(
     JobError? Error,
     long? OutputSizeBytes,
     string? OutputSha256,
-    bool IsResultAvailable)
+    bool IsResultAvailable,
+    TimeSpan SourceLength,
+    TimeSpan EstimatedDuration)
 {
     /// <summary>Bildet die Sicht auf eine Entität ab.</summary>
     public static ConversionJobView From(ConversionJob job) =>
         new(job.Id, job.VoiceId, job.VoiceLabel, job.Status, job.CreatedAtUtc,
             job.StartedAtUtc, job.FinishedAtUtc, job.Error, job.OutputSizeBytes,
-            job.OutputSha256, job.IsResultAvailable);
+            job.OutputSha256, job.IsResultAvailable, job.SourceLength, job.EstimatedDuration);
 }

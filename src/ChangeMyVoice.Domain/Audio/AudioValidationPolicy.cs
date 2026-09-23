@@ -18,7 +18,11 @@ public enum AudioRole
 /// Längste verwertete Referenzaufnahme. Längere Aufnahmen werden gekürzt, weil
 /// Seed-VC sie ohnehin mit <c>ref_audio[: sr * 25]</c> abschneidet.
 /// </param>
-/// <param name="MaxSourceDuration">Längste zulässige Quellaufnahme.</param>
+/// <param name="MaxSourceDuration">
+/// Längste zulässige Quellaufnahme. Bemessen daran, was innerhalb des
+/// Zeitlimits fertig wird: Die Rechenzeit wächst überproportional, sieben
+/// Minuten Material brauchen bereits rund anderthalb Stunden.
+/// </param>
 /// <param name="MinSampleRate">
 /// Kleinste zulässige Abtastrate. Material darunter lässt sich zwar
 /// hochrechnen, klingt aber vorhersehbar schlecht.
@@ -33,7 +37,7 @@ public sealed record AudioLimits(
     public static AudioLimits Default { get; } = new(
         MinReferenceDuration: TimeSpan.FromSeconds(3),
         MaxReferenceDuration: TimeSpan.FromSeconds(25),
-        MaxSourceDuration: TimeSpan.FromMinutes(10),
+        MaxSourceDuration: TimeSpan.FromMinutes(7),
         MinSampleRate: 16000);
 }
 
@@ -158,11 +162,20 @@ public static class AudioValidationPolicy
 
     private static AudioValidationResult ValidateSource(AudioProperties properties, AudioLimits limits)
     {
-        return properties.Duration > limits.MaxSourceDuration
-            ? AudioValidationResult.Invalid(
-                ConversionErrorCode.InvalidAudio,
-                $"Die Quellaufnahme überschreitet die erlaubte Länge von "
-                + $"{limits.MaxSourceDuration.TotalMinutes:0.###} Minuten.")
-            : AudioValidationResult.Valid;
+        if (properties.Duration <= limits.MaxSourceDuration)
+        {
+            return AudioValidationResult.Valid;
+        }
+
+        // Die voraussichtliche Rechenzeit mitzuteilen ist hier wichtiger als
+        // sonst: Eine Ablehnung nach zwei Sekunden ist ungleich brauchbarer als
+        // ein Abbruch nach anderthalb Stunden, bei dem nichts übrig bleibt.
+        var geschaetzt = ConversionDurationEstimate.For(properties.Duration);
+
+        return AudioValidationResult.Invalid(
+            ConversionErrorCode.InvalidAudio,
+            $"Die Quellaufnahme ist {properties.Duration.TotalMinutes:0.#} Minuten lang und "
+            + $"bräuchte damit schätzungsweise {geschaetzt.TotalMinutes:0} Minuten Rechenzeit. "
+            + $"Erlaubt sind {limits.MaxSourceDuration.TotalMinutes:0.#} Minuten.");
     }
 }

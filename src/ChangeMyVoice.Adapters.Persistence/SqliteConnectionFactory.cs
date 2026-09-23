@@ -98,14 +98,44 @@ public sealed class SqliteConnectionFactory
                 output_sha256        TEXT NULL,
                 instance_id          TEXT NOT NULL,
                 inference_process_id INTEGER NULL,
-                artifacts_purged     INTEGER NOT NULL DEFAULT 0
+                artifacts_purged     INTEGER NOT NULL DEFAULT 0,
+                source_length_ms     INTEGER NOT NULL DEFAULT 0
             );
 
+            -- Nachtraeglich ergaenzt; bestehende Datenbanken bekommen die Spalte
+            -- hier, neue haben sie schon aus der Tabellendefinition.
             CREATE INDEX IF NOT EXISTS ix_jobs_status ON conversion_jobs (status);
             CREATE INDEX IF NOT EXISTS ix_jobs_voice ON conversion_jobs (voice_id);
             CREATE INDEX IF NOT EXISTS ix_jobs_purged ON conversion_jobs (artifacts_purged);
             """;
 
         command.ExecuteNonQuery();
+
+        EnsureColumn(connection, "conversion_jobs", "source_length_ms", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    /// <summary>
+    /// Ergänzt eine Spalte, falls sie noch fehlt.
+    /// </summary>
+    /// <remarks>
+    /// Die Tabellendefinition oben greift nur bei einer neuen Datenbank. Eine
+    /// bereits vorhandene würde sonst stillschweigend ohne die Spalte
+    /// weiterlaufen und beim ersten Zugriff scheitern.
+    /// </remarks>
+    private static void EnsureColumn(
+        SqliteConnection connection, string table, string column, string definition)
+    {
+        using var vorhanden = connection.CreateCommand();
+        vorhanden.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = $name;";
+        vorhanden.Parameters.AddWithValue("$name", column);
+
+        if (Convert.ToInt64(vorhanden.ExecuteScalar()) > 0)
+        {
+            return;
+        }
+
+        using var ergaenzen = connection.CreateCommand();
+        ergaenzen.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+        ergaenzen.ExecuteNonQuery();
     }
 }
