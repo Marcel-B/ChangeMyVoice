@@ -30,19 +30,33 @@ cat <<AUSGABE
 
 Zugang fuer "$NAME"
 
-  Schluessel (nur jetzt sichtbar, an die Anwendung geben):
+  Schluessel -- nur jetzt sichtbar, an die Anwendung geben:
 
     $SCHLUESSEL
 
-  Eintrag fuer deploy/gateway/config/clients.json:
+  VOLLSTAENDIGER Inhalt von config/clients.json. Der Rahmen mit "Gateway" und
+  "Clients" gehoert dazu; ein einzelnes Objekt allein wird nicht erkannt, und
+  der Dienst startet dann nicht:
 
-    {
-      "Name": "$NAME",
-      "KeySha256": "$STREUWERT",
-      "RequestsPerMinute": $LIMIT
-    }
+{
+  "Gateway": {
+    "Clients": [
+      {
+        "Name": "$NAME",
+        "KeySha256": "$STREUWERT",
+        "RequestsPerMinute": $LIMIT
+      }
+    ]
+  }
+}
 
-  Die Datei wird im laufenden Betrieb neu eingelesen; ein Neustart des
-  Containers ist nicht noetig.
+  Weitere Anwendungen kommen als zusaetzliche Eintraege in dieselbe Liste.
+
+  Zum Uebernehmen auf dem Container-Host:
+
+    cd /opt/changemyvoice-gateway
+    nano config/clients.json          # Inhalt von oben einsetzen
+    python3 -m json.tool config/clients.json   # Syntax pruefen
+    docker compose restart
 
 AUSGABE
