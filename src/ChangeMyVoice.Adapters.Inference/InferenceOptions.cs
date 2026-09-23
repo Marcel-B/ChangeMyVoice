@@ -67,6 +67,19 @@ public sealed class InferenceOptions
     /// <summary>Das Modell-Backend.</summary>
     public string Backend { get; set; } = "seed-vc";
 
-    /// <summary>Wie lange ein Lauf höchstens dauern darf.</summary>
-    public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(30);
+    /// <summary>
+    /// Wie lange ein Lauf höchstens dauern darf.
+    /// </summary>
+    /// <remarks>
+    /// Gemessen auf Apple Silicon braucht die Konvertierung rund das Neunfache
+    /// der Materiallänge, und der Faktor steigt mit der Länge. Für die
+    /// erlaubten zehn Minuten Material sind das etwa 90 Minuten.
+    /// <para>
+    /// Die Grenze ist ein Notausstieg für hängende Läufe, kein Qualitätsmaß.
+    /// Sie zu knapp zu setzen ist teuer: Das Ergebnis entsteht erst ganz am
+    /// Ende in einem Zug, ein Abbruch verwirft also die gesamte gerechnete
+    /// Zeit, ohne dass etwas Verwertbares übrig bleibt.
+    /// </para>
+    /// </remarks>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(90);
 }
