@@ -12,6 +12,7 @@ using ChangeMyVoice.Application.UseCases.Maintenance;
 using ChangeMyVoice.Application.UseCases.Voices;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -142,8 +143,17 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddProblemDetails();
 
+// Beide Grenzen muessen gesetzt sein, und zwar auf denselben Wert.
+// FormOptions begrenzt den Multipart-Inhalt, Kestrel den Rumpf der Anfrage
+// insgesamt. Fehlt die zweite, greift deren Standardwert von 30 MB: Der Upload
+// bricht dann mitten im Uebertragen ab, obwohl die Einstellung viel mehr
+// erlaubt -- und der Aufrufer sieht nur einen Verbindungsabbruch, keine
+// verstaendliche Meldung.
 builder.Services.AddOptions<FormOptions>().Configure<IOptions<StorageOptions>>(
     (form, storage) => form.MultipartBodyLengthLimit = storage.Value.MaxUploadBytes);
+
+builder.Services.AddOptions<KestrelServerOptions>().Configure<IOptions<StorageOptions>>(
+    (kestrel, storage) => kestrel.Limits.MaxRequestBodySize = storage.Value.MaxUploadBytes);
 
 builder.Services.AddOpenApi("v1", options =>
 {
