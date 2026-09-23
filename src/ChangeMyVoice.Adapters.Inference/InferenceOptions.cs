@@ -71,9 +71,9 @@ public sealed class InferenceOptions
     /// Wie lange ein Lauf höchstens dauern darf.
     /// </summary>
     /// <remarks>
-    /// Gemessen auf Apple Silicon braucht die Konvertierung rund das Neunfache
-    /// der Materiallänge, und der Faktor steigt mit der Länge. Für die
-    /// erlaubten zehn Minuten Material sind das etwa 90 Minuten.
+    /// Bemessen an der längsten erlaubten Quellaufnahme: Sieben Minuten
+    /// Material brauchen nach den Messungen auf Apple Silicon rund 95 Minuten,
+    /// zwei Stunden lassen also etwas Luft für einen ausgelasteten Rechner.
     /// <para>
     /// Die Grenze ist ein Notausstieg für hängende Läufe, kein Qualitätsmaß.
     /// Sie zu knapp zu setzen ist teuer: Das Ergebnis entsteht erst ganz am
@@ -81,5 +81,5 @@ public sealed class InferenceOptions
     /// Zeit, ohne dass etwas Verwertbares übrig bleibt.
     /// </para>
     /// </remarks>
-    public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(90);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(120);
 }

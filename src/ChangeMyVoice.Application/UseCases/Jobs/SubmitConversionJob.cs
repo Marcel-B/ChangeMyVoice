@@ -91,7 +91,7 @@ public sealed class SubmitConversionJob(
 
             var job = ConversionJob.Create(
                 jobId, command.VoiceId, voice.Label.Value, command.Options,
-                clock.GetUtcNow(), instance.InstanceId);
+                clock.GetUtcNow(), instance.InstanceId, sourceProperties!.Duration);
 
             await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
 

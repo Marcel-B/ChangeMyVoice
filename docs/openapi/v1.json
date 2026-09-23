@@ -181,6 +181,15 @@
               }
             ]
           },
+          "estimatedDurationSeconds": {
+            "description": "Voraussichtliche Rechenzeit in Sekunden. Eine Orientierung, keine Zusage —\ngedacht für eine Fortschrittsanzeige, denn ein Lauf kann je nach Länge des\nMaterials deutlich über eine Stunde dauern.",
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
           "finishedAtUtc": {
             "description": "Zeitpunkt des Endes.",
             "format": "date-time",
@@ -217,6 +226,15 @@
               "string"
             ]
           },
+          "sourceLengthSeconds": {
+            "description": "Die Länge der Quellaufnahme in Sekunden.",
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
           "startedAtUtc": {
             "description": "Zeitpunkt des Beginns.",
             "format": "date-time",
@@ -249,7 +267,9 @@
           "error",
           "resultUrl",
           "resultSizeBytes",
-          "resultSha256"
+          "resultSha256",
+          "sourceLengthSeconds",
+          "estimatedDurationSeconds"
         ],
         "type": "object"
       },

@@ -64,6 +64,12 @@ public sealed record JobErrorResponse(string Code, string Message);
 /// <param name="ResultSha256">
 /// Die Prüfsumme der Ergebnisdatei, damit ein abgebrochener Abruf erkennbar ist.
 /// </param>
+/// <param name="SourceLengthSeconds">Die Länge der Quellaufnahme in Sekunden.</param>
+/// <param name="EstimatedDurationSeconds">
+/// Voraussichtliche Rechenzeit in Sekunden. Eine Orientierung, keine Zusage —
+/// gedacht für eine Fortschrittsanzeige, denn ein Lauf kann je nach Länge des
+/// Materials deutlich über eine Stunde dauern.
+/// </param>
 public sealed record JobResponse(
     string JobId,
     string Status,
@@ -75,7 +81,9 @@ public sealed record JobResponse(
     JobErrorResponse? Error,
     string? ResultUrl,
     long? ResultSizeBytes,
-    string? ResultSha256)
+    string? ResultSha256,
+    double SourceLengthSeconds,
+    double EstimatedDurationSeconds)
 {
     /// <summary>Bildet die Antwort aus der Sicht der Anwendungsschicht.</summary>
     public static JobResponse From(ConversionJobView view) =>
@@ -91,7 +99,9 @@ public sealed record JobResponse(
                 : new JobErrorResponse(ToWireFormat(view.Error.Code.ToString()), view.Error.Message),
             view.IsResultAvailable ? $"/api/v1/jobs/{view.Id}/result" : null,
             view.OutputSizeBytes,
-            view.OutputSha256);
+            view.OutputSha256,
+            Math.Round(view.SourceLength.TotalSeconds, 1),
+            Math.Round(view.EstimatedDuration.TotalSeconds));
 
     /// <summary>
     /// Wandelt einen Aufzählungsnamen in die Schreibweise um, die init.md §24

@@ -101,9 +101,26 @@ Für die Übersicht liefert `GET /api/v1/jobs` neben `items` auch `total`, womit
 sich eine Blätterung anzeigen lässt. Die jüngsten Aufträge stehen zuoberst.
 
 **Zum Fortschritt:** Es gibt keine Benachrichtigung, die Oberfläche fragt den
-Zustand ab. Ein Abstand von zwei bis fünf Sekunden ist angemessen — eine
-Konvertierung dauert je nach Länge des Materials rund eine Minute, häufigeres
-Fragen bringt nichts und zählt gegen das Ratenlimit.
+Zustand ab. Ein Abstand von fünf bis zehn Sekunden reicht, häufigeres Fragen
+bringt nichts und zählt gegen das Ratenlimit.
+
+Die Antwort auf `POST /api/v1/jobs` enthält `estimatedDurationSeconds`. Zeig den
+Wert an — die Läufe dauern lange, und ohne Angabe wirkt der Dienst hängen
+geblieben. Gemessen auf dem eingesetzten Mac:
+
+| Material | Rechenzeit |
+| --- | --- |
+| 15 s | gut 1 Minute |
+| 3 Minuten | rund 25 Minuten |
+| 5 Minuten | rund 55 Minuten |
+| 7 Minuten (Maximum) | rund 95 Minuten |
+
+Der Aufwand wächst überproportional. Länger als sieben Minuten wird deshalb
+sofort abgelehnt, mit einer Meldung, die die geschätzte Rechenzeit nennt —
+besser als ein Abbruch nach anderthalb Stunden, bei dem nichts übrig bliebe.
+
+Mit `diffusionSteps=25` statt der voreingestellten 50 halbiert sich die
+Rechenzeit ungefähr, bei etwas geringerer Qualität.
 
 **Zum Ergebnis:** Es bleibt nach dem ersten Abruf noch eine Stunde liegen,
 insgesamt höchstens 24 Stunden. Die Oberfläche sollte es also herunterladen und
