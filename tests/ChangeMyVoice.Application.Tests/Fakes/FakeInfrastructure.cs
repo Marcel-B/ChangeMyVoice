@@ -62,6 +62,7 @@ public sealed class FakeJobWorkspaceStore : IJobWorkspaceStore
         jobId,
         new AudioArtifactRef($"jobs/{jobId}/source.wav"),
         new AudioArtifactRef($"jobs/{jobId}/reference.wav"),
+        new AudioArtifactRef($"jobs/{jobId}/raw-output.wav"),
         new AudioArtifactRef($"jobs/{jobId}/output.wav"));
 
     /// <summary>Legt ein Ergebnis für einen Auftrag ab.</summary>

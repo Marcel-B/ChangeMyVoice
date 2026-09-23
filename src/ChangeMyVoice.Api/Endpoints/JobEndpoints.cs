@@ -90,6 +90,7 @@ internal static class JobEndpoints
         [FromForm] double? lengthAdjust,
         [FromForm] bool? f0Condition,
         [FromForm] bool? fp16,
+        [FromForm] int? outputSampleRate,
         ISubmitConversionJob useCase,
         FileSystemJobWorkspaceStore workspaces,
         CancellationToken cancellationToken)
@@ -101,7 +102,7 @@ internal static class JobEndpoints
 
         if (!ConversionOptions.TryCreate(
                 diffusionSteps, inferenceCfgRate, lengthAdjust, f0Condition, fp16,
-                out var options, out var optionsError))
+                outputSampleRate, out var options, out var optionsError))
         {
             return TypedResults.Problem(
                 detail: optionsError,

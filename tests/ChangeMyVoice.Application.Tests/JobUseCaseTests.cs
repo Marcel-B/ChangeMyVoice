@@ -71,7 +71,7 @@ public class SubmitConversionJobTests
     public async Task Im_Sprachpfad_wird_auf_22050_Hz_normalisiert()
     {
         var voiceId = await GivenVoice();
-        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, out var options, out _)
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, out var options, out _)
             .ShouldBeTrue();
 
         await Sut().ExecuteAsync(new SubmitConversionJobCommand(voiceId, Upload, options));
@@ -233,8 +233,10 @@ public class ProcessConversionJobTests
     private readonly FakeServiceInstance _instance = new();
     private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero));
 
+    private readonly FakeAudioNormalizer _normalizer = new();
+
     private ProcessConversionJob Sut() => new(
-        _jobs, _workspaces, _engine, _instance, _clock,
+        _jobs, _workspaces, _engine, _normalizer, _instance, _clock,
         NullLogger<ProcessConversionJob>.Instance);
 
     private async Task<ConversionJob> GivenQueuedJob()
@@ -311,6 +313,33 @@ public class ProcessConversionJobTests
         await Sut().ExecuteAsync(job.Id);
 
         _engine.Calls.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Das_Ergebnis_wird_auf_die_Ausgaberate_gebracht()
+    {
+        // Das Modell schreibt nach raw-output in seiner eigenen Rate; daraus
+        // entsteht die ausgelieferte Datei mit der Rate des Zielprojekts.
+        var job = await GivenQueuedJob();
+        _workspaces.SetOutput(job.Id, [1, 2, 3, 4]);
+
+        await Sut().ExecuteAsync(job.Id);
+
+        var call = _normalizer.Calls.ShouldHaveSingleItem();
+        call.Source.ShouldEndWith("raw-output.wav");
+        call.Destination.ShouldEndWith("output.wav");
+        call.SampleRate.ShouldBe(48000);
+    }
+
+    [Fact]
+    public async Task Das_Modell_schreibt_in_die_Rohdatei_nicht_in_die_Lieferdatei()
+    {
+        var job = await GivenQueuedJob();
+        _workspaces.SetOutput(job.Id, [1]);
+
+        await Sut().ExecuteAsync(job.Id);
+
+        _engine.Calls.ShouldHaveSingleItem().Output.Locator.ShouldEndWith("raw-output.wav");
     }
 
     [Fact]

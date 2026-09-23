@@ -33,6 +33,25 @@ public sealed record ConversionOptions
     /// <summary>Ob der Diffusionsschritt in halber Genauigkeit läuft.</summary>
     public bool Fp16 { get; private init; } = true;
 
+    /// <summary>
+    /// Die Abtastrate der ausgelieferten Datei.
+    /// </summary>
+    /// <remarks>
+    /// Voreingestellt sind 48 kHz, weil Projekte in der Musikproduktion meist
+    /// damit arbeiten. Das Modell erzeugt 44,1 kHz; die Umrechnung am Ende
+    /// erspart diesen Schritt von Hand. Wer die Datei unverändert so haben will,
+    /// wie das Modell sie erzeugt hat, setzt den Wert auf 44100.
+    /// </remarks>
+    public int OutputSampleRate { get; private init; } = TargetAudioFormat.SampleRateForProduction;
+
+    /// <summary>Das Format, in dem das Ergebnis ausgeliefert wird.</summary>
+    public TargetAudioFormat DeliveryFormat => TargetAudioFormat.ForDelivery(OutputSampleRate);
+
+    /// <summary>
+    /// Ob nach dem Modelldurchlauf noch umgerechnet werden muss.
+    /// </summary>
+    public bool RequiresOutputConversion => OutputSampleRate != TargetFormat.SampleRate;
+
     /// <summary>Das daraus folgende Zielformat für die Eingabedateien.</summary>
     public TargetAudioFormat TargetFormat => TargetAudioFormat.For(F0Condition);
 
@@ -49,6 +68,7 @@ public sealed record ConversionOptions
         double? lengthAdjust,
         bool? f0Condition,
         bool? fp16,
+        int? outputSampleRate,
         out ConversionOptions options,
         out string? error)
     {
@@ -76,8 +96,19 @@ public sealed record ConversionOptions
             return false;
         }
 
+        var ausgaberate = outputSampleRate ?? Default.OutputSampleRate;
+
+        // Die Grenzen decken ab, was Audioprogramme üblicherweise verarbeiten;
+        // exotische Raten brächten hier keinen Gewinn.
+        if (ausgaberate is < 8000 or > 192000)
+        {
+            error = "outputSampleRate muss zwischen 8000 und 192000 Hz liegen.";
+            return false;
+        }
+
         options = new ConversionOptions
         {
+            OutputSampleRate = ausgaberate,
             DiffusionSteps = steps,
             InferenceCfgRate = cfg,
             LengthAdjust = length,
