@@ -17,6 +17,7 @@ public sealed class ProcessConversionJob(
     IConversionJobRepository jobs,
     IJobWorkspaceStore workspaces,
     IVoiceConversionEngine engine,
+    IAudioNormalizer normalizer,
     IServiceInstance instance,
     TimeProvider clock,
     ILogger<ProcessConversionJob> logger) : IProcessConversionJob
@@ -49,7 +50,7 @@ public sealed class ProcessConversionJob(
         {
             var outcome = await engine.ConvertAsync(
                 new ConversionRequest(
-                    workspace.Source, workspace.Reference, workspace.Output, job.Options),
+                    workspace.Source, workspace.Reference, workspace.RawOutput, job.Options),
                 onProcessStarted: pid =>
                 {
                     job.AttachInferenceProcess(pid);
@@ -71,6 +72,16 @@ public sealed class ProcessConversionJob(
                     id, outcome.Error!.Code, outcome.Error.Message);
                 return;
             }
+
+            // Das Modell liefert seine eigene Abtastrate; gefragt ist die, mit
+            // der das Zielprojekt arbeitet. Die Umrechnung hier erspart sie von
+            // Hand -- und ohne sie muesste dasselbe Resampling ohnehin
+            // ausserhalb passieren.
+            await normalizer.NormalizeAsync(
+                workspace.RawOutput,
+                workspace.Output,
+                job.Options.DeliveryFormat,
+                cancellationToken: CancellationToken.None).ConfigureAwait(false);
 
             var (size, sha) = await MeasureOutputAsync(id).ConfigureAwait(false);
 

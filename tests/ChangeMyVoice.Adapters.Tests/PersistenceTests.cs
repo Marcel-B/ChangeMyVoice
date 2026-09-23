@@ -231,7 +231,7 @@ public class SqliteConversionJobRepositoryTests : IDisposable
     [Fact]
     public async Task Die_Einstellungen_des_Laufs_bleiben_erhalten()
     {
-        ConversionOptions.TryCreate(80, 0.5, 1.2, true, false, out var options, out _);
+        ConversionOptions.TryCreate(80, 0.5, 1.2, true, false, null, out var options, out _);
         var job = ConversionJob.Create(
             JobId.New(), VoiceId.New(), "Anna", options, Now, Instance);
 

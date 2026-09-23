@@ -44,6 +44,11 @@ public sealed class FileSystemJobWorkspaceStore : IJobWorkspaceStore
             jobId,
             new AudioArtifactRef(Path.Combine(directory, "source.wav")),
             new AudioArtifactRef(Path.Combine(directory, "reference.wav")),
+            // Das Modell schreibt nach raw-output, die ausgelieferte Datei
+            // entsteht daraus. Getrennte Dateien, damit bei einem Fehlschlag der
+            // Umrechnung nicht ein halb geschriebenes Ergebnis zurueckbleibt,
+            // das wie ein gueltiges aussieht.
+            new AudioArtifactRef(Path.Combine(directory, "raw-output.wav")),
             new AudioArtifactRef(Path.Combine(directory, "output.wav")));
     }
 

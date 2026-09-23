@@ -22,13 +22,13 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 diffusion_steps, inference_cfg_rate, length_adjust, f0_condition, fp16,
                 created_at_utc, started_at_utc, finished_at_utc, downloaded_at_utc,
                 error_code, error_message, output_size_bytes, output_sha256,
-                instance_id, inference_process_id, artifacts_purged, source_length_ms)
+                instance_id, inference_process_id, artifacts_purged, source_length_ms, output_sample_rate)
             VALUES (
                 @Id, @VoiceId, @VoiceLabel, @Status,
                 @DiffusionSteps, @InferenceCfgRate, @LengthAdjust, @F0Condition, @Fp16,
                 @CreatedAt, @StartedAt, @FinishedAt, @DownloadedAt,
                 @ErrorCode, @ErrorMessage, @OutputSize, @OutputSha,
-                @InstanceId, @ProcessId, @Purged, @SourceLength)
+                @InstanceId, @ProcessId, @Purged, @SourceLength, @OutputSampleRate)
             ON CONFLICT(id) DO UPDATE SET
                 status = excluded.status,
                 started_at_utc = excluded.started_at_utc,
@@ -65,6 +65,7 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 ProcessId = job.InferenceProcessId,
                 Purged = job.ArtifactsPurged ? 1 : 0,
                 SourceLength = (long)job.SourceLength.TotalMilliseconds,
+                OutputSampleRate = job.Options.OutputSampleRate,
             }).ConfigureAwait(false);
     }
 
@@ -172,12 +173,14 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
         public long? Inference_Process_Id { get; init; }
         public long Artifacts_Purged { get; init; }
         public long Source_Length_Ms { get; init; }
+        public long Output_Sample_Rate { get; init; }
 
         public ConversionJob ToDomain()
         {
             ConversionOptions.TryCreate(
                 Diffusion_Steps, Inference_Cfg_Rate, Length_Adjust,
-                F0_Condition != 0, Fp16 != 0, out var options, out _);
+                F0_Condition != 0, Fp16 != 0, Output_Sample_Rate == 0 ? null : (int)Output_Sample_Rate,
+                out var options, out _);
 
             JobError? error = null;
             if (Error_Code is not null &&

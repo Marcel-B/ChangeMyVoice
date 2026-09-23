@@ -122,6 +122,11 @@ besser als ein Abbruch nach anderthalb Stunden, bei dem nichts übrig bliebe.
 Mit `diffusionSteps=25` statt der voreingestellten 50 halbiert sich die
 Rechenzeit ungefähr, bei etwas geringerer Qualität.
 
+**Zur Abtastrate:** Das Ergebnis kommt mit 48 kHz, passend zu üblichen
+Projekteinstellungen. Braucht dein Projekt etwas anderes, setz
+`outputSampleRate` beim Anlegen des Auftrags — etwa `44100` für die
+unveränderte Ausgabe des Modells.
+
 **Zum Ergebnis:** Es bleibt nach dem ersten Abruf noch eine Stunde liegen,
 insgesamt höchstens 24 Stunden. Die Oberfläche sollte es also herunterladen und
 selbst ablegen, wenn es dauerhaft verfügbar sein soll. `resultSha256` aus der

@@ -126,3 +126,71 @@ public class SourceLengthRejectionTests
         AudioLimits.Default.MaxSourceDuration.ShouldBe(TimeSpan.FromMinutes(7));
     }
 }
+
+public class OutputSampleRateTests
+{
+    [Fact]
+    public void Ausgeliefert_wird_voreingestellt_mit_48_kHz()
+    {
+        // Projekte in der Musikproduktion arbeiten meist damit; das Modell
+        // erzeugt aber 44,1 kHz.
+        ConversionOptions.Default.OutputSampleRate.ShouldBe(48000);
+        ConversionOptions.Default.DeliveryFormat.SampleRate.ShouldBe(48000);
+    }
+
+    [Fact]
+    public void Im_Gesangspfad_muss_am_Ende_umgerechnet_werden()
+    {
+        // Das Modell liefert 44,1 kHz, ausgeliefert werden 48 kHz.
+        ConversionOptions.Default.TargetFormat.SampleRate.ShouldBe(44100);
+        ConversionOptions.Default.RequiresOutputConversion.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Wer_die_Modellrate_will_bekommt_sie_unveraendert()
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, 44100, out var options, out _)
+            .ShouldBeTrue();
+
+        options.OutputSampleRate.ShouldBe(44100);
+        // Keine Umrechnung: die Datei bleibt genau so, wie das Modell sie erzeugt hat.
+        options.RequiresOutputConversion.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(44100)]
+    [InlineData(48000)]
+    [InlineData(96000)]
+    public void Uebliche_Raten_werden_angenommen(int rate)
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, rate, out var options, out _)
+            .ShouldBeTrue();
+
+        options.OutputSampleRate.ShouldBe(rate);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100)]
+    [InlineData(500000)]
+    public void Unsinnige_Raten_werden_abgelehnt(int rate)
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, rate, out _, out var error)
+            .ShouldBeFalse();
+
+        error.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Der_Sprachpfad_wird_ebenfalls_auf_die_Ausgaberate_gebracht()
+    {
+        // Er erzeugt 22,05 kHz -- ohne Umrechnung waere die Datei fuer ein
+        // Projekt noch weniger brauchbar als mit 44,1 kHz.
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null,
+            out var options, out _).ShouldBeTrue();
+
+        options.TargetFormat.SampleRate.ShouldBe(22050);
+        options.RequiresOutputConversion.ShouldBeTrue();
+        options.DeliveryFormat.SampleRate.ShouldBe(48000);
+    }
+}

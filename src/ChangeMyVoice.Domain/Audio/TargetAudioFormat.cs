@@ -43,4 +43,22 @@ public sealed record TargetAudioFormat
     /// Pfade bedient und höchstens einmal heruntergerechnet werden muss.
     /// </summary>
     public static TargetAudioFormat ReferenceMaster => new(SampleRateWithF0);
+
+    /// <summary>
+    /// Die übliche Abtastrate in der Musikproduktion. Logic, Pro Tools und
+    /// andere Programme arbeiten meist damit.
+    /// </summary>
+    public const int SampleRateForProduction = 48000;
+
+    /// <summary>
+    /// Das Format, in dem das Ergebnis ausgeliefert wird.
+    /// </summary>
+    /// <remarks>
+    /// Das Modell erzeugt 44,1 kHz; ein Projekt mit 48 kHz kann die Datei dann
+    /// nicht ohne Weiteres übernehmen. Die Umrechnung am Ende erspart diesen
+    /// Schritt von Hand. Sie kostet theoretisch etwas Qualität, praktisch fällt
+    /// das neben dem Modelldurchlauf nicht ins Gewicht — und ohne sie müsste
+    /// dasselbe Resampling ohnehin außerhalb passieren.
+    /// </remarks>
+    public static TargetAudioFormat ForDelivery(int sampleRate) => new(sampleRate);
 }

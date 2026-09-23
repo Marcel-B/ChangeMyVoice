@@ -40,11 +40,18 @@ public interface IVoiceStorage
 /// <param name="JobId">Der zugehörige Auftrag.</param>
 /// <param name="Source">Die normalisierte Quellaufnahme.</param>
 /// <param name="Reference">Die auf die Zielrate gebrachte Referenz.</param>
-/// <param name="Output">Der Ort, an den das Ergebnis geschrieben wird.</param>
+/// <param name="RawOutput">
+/// Der Ort, an den das Modell schreibt — in dessen eigener Abtastrate.
+/// </param>
+/// <param name="Output">
+/// Die ausgelieferte Datei. Sie entsteht aus dem Rohergebnis, wenn dessen Rate
+/// nicht der gewünschten entspricht; andernfalls ist sie dasselbe.
+/// </param>
 public sealed record JobWorkspace(
     JobId JobId,
     AudioArtifactRef Source,
     AudioArtifactRef Reference,
+    AudioArtifactRef RawOutput,
     AudioArtifactRef Output);
 
 /// <summary>Ein vorgefundenes Arbeitsverzeichnis auf der Platte.</summary>
