@@ -156,6 +156,54 @@ public sealed class GetReferenceVoice(IReferenceVoiceRepository repository) : IG
     }
 }
 
+/// <summary>Die abgelegte Aufnahme einer Referenzstimme.</summary>
+/// <param name="Content">Der Datenstrom; der Aufrufer schließt ihn.</param>
+/// <param name="FileName">Der Dateiname für den Abruf.</param>
+public sealed record ReferenceVoiceAudio(Stream Content, string FileName);
+
+/// <summary>
+/// Liefert die abgelegte Aufnahme einer Referenzstimme — den Master, also genau
+/// das, was das Modell bekommt: Mono, 44,1 kHz, höchstens 25 Sekunden. Damit
+/// lässt sich nachhören, ob eine Stimme taugt, bevor ein Auftrag Minuten auf
+/// ihr rechnet. Die ursprünglich hochgeladene Datei behält der Dienst nicht.
+/// </summary>
+public interface IGetReferenceVoiceAudio
+{
+    /// <summary>Führt den Anwendungsfall aus.</summary>
+    Task<Result<ReferenceVoiceAudio>> ExecuteAsync(
+        VoiceId id, CancellationToken cancellationToken = default);
+}
+
+/// <inheritdoc />
+public sealed class GetReferenceVoiceAudio(
+    IReferenceVoiceRepository repository,
+    IVoiceStorage storage) : IGetReferenceVoiceAudio
+{
+    /// <inheritdoc />
+    public async Task<Result<ReferenceVoiceAudio>> ExecuteAsync(
+        VoiceId id, CancellationToken cancellationToken = default)
+    {
+        var voice = await repository.FindAsync(id, cancellationToken).ConfigureAwait(false);
+        if (voice is null)
+        {
+            return Result<ReferenceVoiceAudio>.Failure(
+                OperationErrorCode.VoiceNotFound, $"Es gibt keine Referenzstimme mit der Kennung '{id}'.");
+        }
+
+        var stream = await storage.OpenMasterAsync(id, cancellationToken).ConfigureAwait(false);
+        if (stream is null)
+        {
+            // Der Datensatz ist da, die Datei nicht — nach einem Eingriff von
+            // außen. Das soll nicht als 500 enden.
+            return Result<ReferenceVoiceAudio>.Failure(
+                OperationErrorCode.VoiceNotFound,
+                $"Die Aufnahme der Referenzstimme '{voice.Label.Value}' ist nicht mehr vorhanden.");
+        }
+
+        return Result<ReferenceVoiceAudio>.Success(new ReferenceVoiceAudio(stream, $"{id}.wav"));
+    }
+}
+
 /// <summary>Entfernt eine Referenzstimme.</summary>
 public interface IDeleteReferenceVoice
 {

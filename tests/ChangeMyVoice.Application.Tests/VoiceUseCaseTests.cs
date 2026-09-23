@@ -200,3 +200,61 @@ public class DeleteReferenceVoiceTests
         result.IsSuccess.ShouldBeTrue();
     }
 }
+
+public class GetReferenceVoiceAudioTests
+{
+    private readonly InMemoryReferenceVoiceRepository _voices = new();
+    private readonly FakeVoiceStorage _storage = new();
+
+    private static readonly DateTimeOffset Now = new(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+
+    private async Task<VoiceId> GivenVoice(bool withMaster = true)
+    {
+        var id = VoiceId.New();
+        if (withMaster)
+        {
+            _storage.ReserveMaster(id);
+        }
+
+        await _voices.SaveAsync(ReferenceVoice.Create(
+            id, VoiceLabel.Create("Anna"), Now,
+            new AudioProperties("pcm_s16le", TimeSpan.FromSeconds(10), 44100, 1),
+            new AudioProperties("mp3", TimeSpan.FromSeconds(10), 44100, 2)));
+        return id;
+    }
+
+    private GetReferenceVoiceAudio Sut() => new(_voices, _storage);
+
+    [Fact]
+    public async Task Der_Master_wird_unter_der_Kennung_geliefert()
+    {
+        var id = await GivenVoice();
+
+        var result = await Sut().ExecuteAsync(id);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value!.FileName.ShouldBe($"{id}.wav");
+        await using var content = result.Value.Content;
+        using var copy = new MemoryStream();
+        await content.CopyToAsync(copy);
+        copy.ToArray().ShouldBe(FakeVoiceStorage.MasterContent);
+    }
+
+    [Fact]
+    public async Task Eine_unbekannte_Stimme_meldet_sich_als_nicht_gefunden()
+    {
+        var result = await Sut().ExecuteAsync(VoiceId.New());
+
+        result.Error!.Code.ShouldBe(OperationErrorCode.VoiceNotFound);
+    }
+
+    [Fact]
+    public async Task Fehlt_die_Datei_endet_das_nicht_als_Ausnahme()
+    {
+        var id = await GivenVoice(withMaster: false);
+
+        var result = await Sut().ExecuteAsync(id);
+
+        result.Error!.Code.ShouldBe(OperationErrorCode.VoiceNotFound);
+    }
+}

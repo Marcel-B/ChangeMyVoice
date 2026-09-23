@@ -32,6 +32,12 @@ public interface IVoiceStorage
     /// <summary>Prüft, ob der Master vorhanden ist.</summary>
     bool MasterExists(VoiceId id);
 
+    /// <summary>
+    /// Öffnet den Master zum Lesen, oder <c>null</c>, wenn er fehlt. Gebraucht,
+    /// um eine Stimme so anzuhören, wie das Modell sie bekommt.
+    /// </summary>
+    Task<Stream?> OpenMasterAsync(VoiceId id, CancellationToken cancellationToken = default);
+
     /// <summary>Entfernt die Dateien einer Stimme.</summary>
     Task DeleteAsync(VoiceId id, CancellationToken cancellationToken = default);
 }

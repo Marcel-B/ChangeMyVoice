@@ -26,6 +26,12 @@ public sealed class FakeVoiceStorage : IVoiceStorage
 
     public bool MasterExists(VoiceId id) => _masters.Contains(id);
 
+    /// <summary>Was ein geöffneter Master enthält.</summary>
+    public static readonly byte[] MasterContent = "RIFFmaster"u8.ToArray();
+
+    public Task<Stream?> OpenMasterAsync(VoiceId id, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Stream?>(_masters.Contains(id) ? new MemoryStream(MasterContent) : null);
+
     public Task DeleteAsync(VoiceId id, CancellationToken cancellationToken = default)
     {
         _masters.Remove(id);

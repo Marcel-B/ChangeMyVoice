@@ -48,6 +48,12 @@ public class WorkflowTests(ApiFactory factory) : IClassFixture<ApiFactory>
         voice.Stored.Channels.ShouldBe(1);
         voice.Stored.Codec.ShouldBe("pcm_s16le");
 
+        // Nachhören lässt sie sich so, wie das Modell sie bekommt.
+        var audio = await client.GetAsync($"/api/v1/voices/{voice.Id}/audio");
+        audio.StatusCode.ShouldBe(HttpStatusCode.OK);
+        audio.Content.Headers.ContentType!.MediaType.ShouldBe("audio/wav");
+        (await audio.Content.ReadAsByteArrayAsync()).Take(4).ShouldBe("RIFF"u8.ToArray());
+
         // 2. Sie taucht in der Übersicht auf
         var list = await client.GetFromJsonAsync<ReferenceVoiceResponse[]>("/api/v1/voices");
         list.ShouldNotBeNull();
@@ -140,6 +146,15 @@ public class WorkflowTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var response = await factory.CreateAuthenticatedClient()
             .GetAsync($"/api/v1/voices/{Guid.NewGuid():n}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Die_Aufnahme_einer_unbekannten_Stimme_liefert_404()
+    {
+        var response = await factory.CreateAuthenticatedClient()
+            .GetAsync($"/api/v1/voices/{Guid.NewGuid():n}/audio");
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

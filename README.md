@@ -52,6 +52,7 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 | `POST` | `/voices` | Referenzstimme senden |
 | `GET` | `/voices` | Alle Referenzstimmen anzeigen |
 | `GET` | `/voices/{id}` | Einzelne Referenzstimme abrufen |
+| `GET` | `/voices/{id}/audio` | Aufnahme einer Referenzstimme herunterladen (der Master: Mono, 44,1 kHz, höchstens 25 s) |
 | `DELETE` | `/voices/{id}` | Referenzstimme löschen |
 | `POST` | `/jobs` | Stimme zur Änderung senden |
 | `GET` | `/jobs` | Alle Aufträge anzeigen (seitenweise, filterbar) |

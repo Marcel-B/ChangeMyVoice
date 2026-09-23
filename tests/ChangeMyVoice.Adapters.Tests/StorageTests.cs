@@ -55,6 +55,22 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task Ein_Master_laesst_sich_lesen_ein_fehlender_nicht()
+    {
+        var id = GivenStoredVoice();
+
+        await using (var stream = await _voices.OpenMasterAsync(id))
+        {
+            stream.ShouldNotBeNull();
+            using var copy = new MemoryStream();
+            await stream.CopyToAsync(copy);
+            copy.ToArray().ShouldBe([1, 2, 3]);
+        }
+
+        (await _voices.OpenMasterAsync(VoiceId.New())).ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Eine_geloeschte_Stimme_ist_vollstaendig_weg()
     {
         var id = GivenStoredVoice();
