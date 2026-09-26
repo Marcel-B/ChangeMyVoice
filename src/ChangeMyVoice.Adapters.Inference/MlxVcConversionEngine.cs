@@ -52,6 +52,17 @@ public sealed class MlxVcConversionEngine(
             arguments.Add("--f0-condition");
         }
 
+        if (request.Options.SemiToneShift != 0)
+        {
+            arguments.Add("--semi-tone-shift");
+            arguments.Add(request.Options.SemiToneShift.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (request.Options.AutoF0Adjust)
+        {
+            arguments.Add("--auto-f0-adjust");
+        }
+
         if (!request.Options.Fp16)
         {
             arguments.Add("--no-fp16");

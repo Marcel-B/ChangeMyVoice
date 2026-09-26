@@ -129,6 +129,20 @@ erreichbar sein. Mit `Webhooks:AllowedHosts` lässt sich festlegen, welche
 Rechner überhaupt angegeben werden dürfen (leer heißt: jeder); weitere
 Einstellungen unter `Webhooks` sind `Timeout`, `MaxAttempts` und `RetryDelay`.
 
+### Tonhöhe
+
+Im Gesangspfad lässt sich die Tonhöhe beim Senden eines Auftrags verschieben:
+
+| Feld | Wirkung |
+| --- | --- |
+| `semiToneShift` | ganze Halbtöne, −24 bis 24; unter der ursprünglichen Begleitung bleiben nur ganze Oktaven (±12) in der Tonart |
+| `autoF0Adjust` | legt die mittlere Tonlage der Quelle auf die der Referenz, um einen beliebigen Betrag; für Gesang, der wieder unter die Begleitung soll, ungeeignet |
+
+Verschoben wird der Tonhöhenverlauf, den das Modell als Vorgabe bekommt, nicht
+das fertige Audio; das Timbre bleibt deshalb unverfälscht. Ohne
+F0-Konditionierung (`f0Condition=false`) gibt es keinen solchen Verlauf, beide
+Felder werden dann mit 400 abgelehnt.
+
 ## Audio-Formate
 
 Angenommen werden **WAV, MP3, FLAC, M4A/AAC und OGG/Opus** — Clients müssen kein
@@ -313,13 +327,17 @@ sich nur an einer tatsächlich umgewandelten Datei nachmessen.
 
 ## Bekannte Punkte
 
-- **Modell-Ladezeit pro Auftrag.** `mlx_vc.backend.run_backend` startet intern
-  selbst einen Unterprozess, und `seed_vc_infer.py` hält keine Modelle vor. Ein
-  dauerhaft geladener Arbeiter, wie ihn init.md §22 vorschlägt, ist damit ohne
-  Eingriff in mlx-vc nicht erreichbar. Die Ladezeit wird gemessen und
+- **Modell-Ladezeit pro Auftrag.** `scripts/changemyvoice_infer.py` lädt
+  Seed-VC bei jedem Auftrag neu; ein dauerhaft geladener Arbeiter, wie ihn
+  init.md §22 vorschlägt, fehlt noch. Die Ladezeit wird gemessen und
   protokolliert, damit ein späterer Umbau begründet entschieden werden kann;
   hinter `IVoiceConversionEngine` ist er austauschbar, ohne dass Domäne,
   Anwendungsfälle oder API sich ändern.
+- **Eigene Inferenz statt `mlx_vc.backend.run_backend`.** Dessen
+  Seed-VC-Backend lädt im Gesangspfad das F0-Modell, gibt den
+  Tonhöhenverlauf aber nie an das Modell weiter; das Modell rät die Tonhöhe
+  dann aus dem Inhalt. Das Skript rechnet deshalb selbst, nach dem Vorbild von
+  Seed-VCs `inference.py`, in derselben venv und mit denselben Checkpoints.
 - **Der Gesangspfad ist die Voreinstellung und kostet Zeit.** `f0_condition`
   ist standardmäßig an: Die Konvertierung läuft bei 44,1 kHz mit
   F0-Konditionierung, wodurch die Tonhöhe sauber übertragen wird. Das ist für
