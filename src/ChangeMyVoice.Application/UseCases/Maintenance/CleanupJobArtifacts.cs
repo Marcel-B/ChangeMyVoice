@@ -51,6 +51,7 @@ public sealed class CleanupJobArtifacts(
     IConversionJobRepository jobs,
     IJobWorkspaceStore workspaces,
     CleanupSettings settings,
+    IJobNotifier notifier,
     TimeProvider clock,
     ILogger<CleanupJobArtifacts> logger) : ICleanupJobArtifacts
 {
@@ -80,6 +81,7 @@ public sealed class CleanupJobArtifacts(
                 await workspaces.DeleteAsync(job.Id, cancellationToken).ConfigureAwait(false);
                 job.MarkArtifactsPurged();
                 await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
+                notifier.NotifyFinished(job);
 
                 timedOut++;
                 logger.LogWarning("Auftrag {JobId} wegen Zeitüberschreitung beendet.", job.Id);

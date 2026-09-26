@@ -10,10 +10,12 @@ namespace ChangeMyVoice.Application.UseCases.Jobs;
 /// <param name="VoiceId">Die gewünschte Referenzstimme.</param>
 /// <param name="Upload">Die bereits abgelegte Quellaufnahme.</param>
 /// <param name="Options">Die gewählten Stellschrauben.</param>
+/// <param name="WebhookUrl">Die Adresse, die beim Ende aufgerufen wird, falls gewünscht.</param>
 public sealed record SubmitConversionJobCommand(
     VoiceId VoiceId,
     AudioArtifactRef Upload,
-    ConversionOptions Options);
+    ConversionOptions Options,
+    WebhookUrl? WebhookUrl = null);
 
 /// <summary>Nimmt einen Konvertierungsauftrag entgegen.</summary>
 public interface ISubmitConversionJob
@@ -91,7 +93,8 @@ public sealed class SubmitConversionJob(
 
             var job = ConversionJob.Create(
                 jobId, command.VoiceId, voice.Label.Value, command.Options,
-                clock.GetUtcNow(), instance.InstanceId, sourceProperties!.Duration);
+                clock.GetUtcNow(), instance.InstanceId, sourceProperties!.Duration,
+                command.WebhookUrl);
 
             await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
 

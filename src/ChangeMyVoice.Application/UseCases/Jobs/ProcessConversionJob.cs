@@ -19,6 +19,7 @@ public sealed class ProcessConversionJob(
     IVoiceConversionEngine engine,
     IAudioNormalizer normalizer,
     IServiceInstance instance,
+    IJobNotifier notifier,
     TimeProvider clock,
     ILogger<ProcessConversionJob> logger) : IProcessConversionJob
 {
@@ -66,6 +67,7 @@ public sealed class ProcessConversionJob(
             {
                 job.Fail(clock.GetUtcNow(), outcome.Error!);
                 await jobs.SaveAsync(job, CancellationToken.None).ConfigureAwait(false);
+                notifier.NotifyFinished(job);
 
                 logger.LogWarning(
                     "Auftrag {JobId} fehlgeschlagen: {Code} — {Message}",
@@ -91,11 +93,13 @@ public sealed class ProcessConversionJob(
                     ConversionErrorCode.OutputNotCreated,
                     "Der Lauf meldete Erfolg, es entstand aber keine Ausgabedatei."));
                 await jobs.SaveAsync(job, CancellationToken.None).ConfigureAwait(false);
+                notifier.NotifyFinished(job);
                 return;
             }
 
             job.Complete(clock.GetUtcNow(), size.Value, sha!);
             await jobs.SaveAsync(job, CancellationToken.None).ConfigureAwait(false);
+            notifier.NotifyFinished(job);
 
             logger.LogInformation(
                 "Auftrag {JobId} abgeschlossen: {Bytes} Bytes, Modellladezeit {ModelLoad}, Inferenz {Inference}.",
@@ -109,6 +113,7 @@ public sealed class ProcessConversionJob(
             job.Fail(clock.GetUtcNow(), new JobError(
                 ConversionErrorCode.Interrupted, "Der Dienst wurde während des Laufs beendet."));
             await jobs.SaveAsync(job, CancellationToken.None).ConfigureAwait(false);
+            notifier.NotifyFinished(job);
             throw;
         }
         catch (Exception ex)
@@ -120,6 +125,7 @@ public sealed class ProcessConversionJob(
             job.Fail(clock.GetUtcNow(), new JobError(
                 ConversionErrorCode.InferenceFailed, "Die Konvertierung ist unerwartet fehlgeschlagen."));
             await jobs.SaveAsync(job, CancellationToken.None).ConfigureAwait(false);
+            notifier.NotifyFinished(job);
         }
     }
 

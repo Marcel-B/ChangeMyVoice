@@ -114,6 +114,56 @@ public class WorkflowTests(ApiFactory factory) : IClassFixture<ApiFactory>
         (await response.Content.ReadAsStringAsync()).ShouldContain("REFERENCE_TOO_SHORT");
     }
 
+    [SkippableFact]
+    public async Task Ein_Auftrag_mit_Webhook_meldet_sein_Ende()
+    {
+        Skip.IfNot(TestAudio.Available, "ffmpeg ist nicht verfügbar.");
+        var client = factory.CreateAuthenticatedClient();
+
+        var created = await client.PostAsync(
+            "/api/v1/voices", VoiceUpload($"Hook-{Guid.NewGuid():n}", TestAudio.Tone()));
+        var voice = await created.Content.ReadFromJsonAsync<ReferenceVoiceResponse>();
+
+        var target = new Uri($"https://{ApiFactory.WebhookHost}/voice/{Guid.NewGuid():n}");
+        var upload = JobUpload(voice!.Id, TestAudio.Tone(5));
+        upload.Add(new StringContent(target.AbsoluteUri), "webhookUrl");
+
+        var accepted = await client.PostAsync("/api/v1/jobs", upload);
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var job = await accepted.Content.ReadFromJsonAsync<JobResponse>();
+        job!.WebhookUrl.ShouldBe(target.AbsoluteUri);
+
+        var body = await factory.Webhooks.WaitForAsync(target);
+
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        json.RootElement.GetProperty("jobId").GetString().ShouldBe(job.JobId);
+        json.RootElement.GetProperty("status").GetString().ShouldBe("COMPLETED");
+        json.RootElement.GetProperty("resultUrl").GetString()
+            .ShouldBe($"/api/v1/jobs/{job.JobId}/result");
+
+        // Beim Eintreffen ist der Zustand bereits gespeichert: Wer daraufhin
+        // nachfragt, sieht das Ende.
+        var status = await client.GetFromJsonAsync<JobResponse>($"/api/v1/jobs/{job.JobId}");
+        status!.Status.ShouldBe("COMPLETED");
+    }
+
+    [Theory]
+    [InlineData("keine-adresse")]
+    [InlineData("ftp://receiver.test/hook")]
+    [InlineData("https://nicht-freigegeben.test/hook")]
+    public async Task Eine_ungueltige_Webhook_Adresse_wird_abgelehnt(string webhookUrl)
+    {
+        var client = factory.CreateAuthenticatedClient();
+        var upload = JobUpload(Guid.NewGuid().ToString(), [1, 2, 3]);
+        upload.Add(new StringContent(webhookUrl), "webhookUrl");
+
+        var response = await client.PostAsync("/api/v1/jobs", upload);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("INVALID_INPUT");
+    }
+
     [Fact]
     public async Task Eine_Datei_ohne_Audio_wird_abgelehnt_und_erzeugt_keinen_Auftrag()
     {

@@ -1,3 +1,4 @@
+using ChangeMyVoice.Adapters.Notifications;
 using ChangeMyVoice.Adapters.Storage;
 using ChangeMyVoice.Application.Ports;
 using ChangeMyVoice.Application.UseCases.Jobs;
@@ -254,6 +255,22 @@ public sealed class ConversionWorker(
                 // für alle folgenden Aufträge stehen.
                 logger.LogError(ex, "Auftrag {JobId} konnte nicht bearbeitet werden.", jobId);
             }
+        }
+    }
+}
+
+/// <summary>Stellt die Benachrichtigungen über beendete Aufträge zu.</summary>
+public sealed class WebhookDeliveryService(WebhookDispatcher dispatcher) : BackgroundService
+{
+    /// <inheritdoc />
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await dispatcher.RunAsync(stoppingToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
         }
     }
 }

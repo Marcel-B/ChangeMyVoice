@@ -185,3 +185,60 @@ public class VoiceLabelTests
         a.ComparisonKey.ShouldBe(b.ComparisonKey);
     }
 }
+
+public class WebhookUrlTests
+{
+    [Theory]
+    [InlineData("https://yue.example/hook")]
+    [InlineData("http://127.0.0.1:5091/api/voice/done?job=1")]
+    [InlineData("  https://pve.tail6105c0.ts.net:8444/hook  ")]
+    public void Absolute_http_Adressen_werden_angenommen(string input)
+    {
+        WebhookUrl.TryCreate(input, [], out var url, out var error).ShouldBeTrue(error);
+
+        url.Value.IsAbsoluteUri.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("/relative/hook")]
+    [InlineData("ftp://yue.example/hook")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("keine adresse")]
+    public void Andere_Eingaben_werden_abgelehnt(string input)
+    {
+        WebhookUrl.TryCreate(input, [], out _, out var error).ShouldBeFalse();
+
+        error.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void Zugangsdaten_in_der_Adresse_werden_abgelehnt()
+    {
+        // Sie landeten sonst in Datenbank, Protokollen und der Statusantwort.
+        WebhookUrl.TryCreate("https://nutzer:geheim@yue.example/hook", [], out _, out var error)
+            .ShouldBeFalse();
+
+        error!.ShouldContain("Zugangsdaten");
+    }
+
+    [Fact]
+    public void Eine_zu_lange_Adresse_wird_abgelehnt()
+    {
+        var input = "https://yue.example/" + new string('a', WebhookUrl.MaxLength);
+
+        WebhookUrl.TryCreate(input, [], out _, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Mit_Freigabeliste_sind_nur_die_genannten_Rechner_erlaubt()
+    {
+        string[] allowed = ["127.0.0.1", "YUE.example"];
+
+        WebhookUrl.TryCreate("https://yue.example/hook", allowed, out _, out _).ShouldBeTrue();
+        WebhookUrl.TryCreate("http://127.0.0.1:5091/hook", allowed, out _, out _).ShouldBeTrue();
+        WebhookUrl.TryCreate("http://192.168.2.1/admin", allowed, out _, out var error).ShouldBeFalse();
+        error!.ShouldContain("192.168.2.1");
+    }
+}

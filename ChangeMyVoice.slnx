@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/ChangeMyVoice.Adapters.Inference/ChangeMyVoice.Adapters.Inference.csproj" />
+    <Project Path="src/ChangeMyVoice.Adapters.Notifications/ChangeMyVoice.Adapters.Notifications.csproj" />
     <Project Path="src/ChangeMyVoice.Adapters.Persistence/ChangeMyVoice.Adapters.Persistence.csproj" />
     <Project Path="src/ChangeMyVoice.Adapters.Storage/ChangeMyVoice.Adapters.Storage.csproj" />
     <Project Path="src/ChangeMyVoice.Api/ChangeMyVoice.Api.csproj" />

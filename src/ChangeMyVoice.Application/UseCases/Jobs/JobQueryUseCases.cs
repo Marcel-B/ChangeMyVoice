@@ -111,6 +111,7 @@ public interface ICancelJob
 public sealed class CancelJob(
     IConversionJobRepository jobs,
     IJobWorkspaceStore workspaces,
+    IJobNotifier notifier,
     TimeProvider clock) : ICancelJob
 {
     /// <inheritdoc />
@@ -125,7 +126,8 @@ public sealed class CancelJob(
 
         // Ein bereits beendeter Auftrag wird nicht erneut abgebrochen; der Aufruf
         // gilt trotzdem als erfolgreich, damit er gefahrlos wiederholbar bleibt.
-        if (!job.IsTerminal)
+        var wasRunning = !job.IsTerminal;
+        if (wasRunning)
         {
             job.Cancel(clock.GetUtcNow());
         }
@@ -133,6 +135,13 @@ public sealed class CancelJob(
         await workspaces.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         job.MarkArtifactsPurged();
         await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
+
+        // Nur beim ersten Abbruch melden: Ein wiederholter Aufruf ändert nichts
+        // und soll den Empfänger nicht erneut anstoßen.
+        if (wasRunning)
+        {
+            notifier.NotifyFinished(job);
+        }
 
         return Result.Success();
     }

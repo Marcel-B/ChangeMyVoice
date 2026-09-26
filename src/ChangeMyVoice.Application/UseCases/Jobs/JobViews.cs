@@ -17,6 +17,7 @@ namespace ChangeMyVoice.Application.UseCases.Jobs;
 /// <param name="IsResultAvailable">Ob das Ergebnis abgerufen werden kann.</param>
 /// <param name="SourceLength">Die Länge der Quellaufnahme.</param>
 /// <param name="EstimatedDuration">Voraussichtliche Rechenzeit.</param>
+/// <param name="WebhookUrl">Die Adresse, die beim Ende aufgerufen wird, falls angegeben.</param>
 public sealed record ConversionJobView(
     JobId Id,
     VoiceId VoiceId,
@@ -30,11 +31,13 @@ public sealed record ConversionJobView(
     string? OutputSha256,
     bool IsResultAvailable,
     TimeSpan SourceLength,
-    TimeSpan EstimatedDuration)
+    TimeSpan EstimatedDuration,
+    WebhookUrl? WebhookUrl = null)
 {
     /// <summary>Bildet die Sicht auf eine Entität ab.</summary>
     public static ConversionJobView From(ConversionJob job) =>
         new(job.Id, job.VoiceId, job.VoiceLabel, job.Status, job.CreatedAtUtc,
             job.StartedAtUtc, job.FinishedAtUtc, job.Error, job.OutputSizeBytes,
-            job.OutputSha256, job.IsResultAvailable, job.SourceLength, job.EstimatedDuration);
+            job.OutputSha256, job.IsResultAvailable, job.SourceLength, job.EstimatedDuration,
+            job.WebhookUrl);
 }

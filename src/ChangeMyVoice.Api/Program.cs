@@ -1,4 +1,5 @@
 using ChangeMyVoice.Adapters.Inference;
+using ChangeMyVoice.Adapters.Notifications;
 using ChangeMyVoice.Adapters.Persistence;
 using ChangeMyVoice.Adapters.Storage;
 using ChangeMyVoice.Api.Contracts;
@@ -55,6 +56,11 @@ builder.Services.AddOptions<AudioToolingOptions>()
 builder.Services.AddOptions<WorkerOptions>()
     .Bind(builder.Configuration.GetSection(WorkerOptions.SectionName));
 
+builder.Services.AddOptions<WebhookOptions>()
+    .Bind(builder.Configuration.GetSection(WebhookOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddOptions<ApiSecurityOptions>()
     .Bind(builder.Configuration.GetSection(ApiSecurityOptions.SectionName))
     .ValidateDataAnnotations()
@@ -80,6 +86,14 @@ builder.Services.AddSingleton<IAudioNormalizer, FfmpegAudioNormalizer>();
 builder.Services.AddSingleton<IVoiceConversionEngine, MlxVcConversionEngine>();
 builder.Services.AddSingleton<IInferenceEnvironmentProbe, PythonEnvironmentProbe>();
 builder.Services.AddSingleton<IOrphanProcessKiller, ProcessTreeKiller>();
+
+// Keine Weiterleitungen: Sonst könnte ein freigegebener Rechner den Aufruf zu
+// einem Ziel umlenken, das die Freigabeliste gerade ausschließen soll.
+builder.Services.AddHttpClient(WebhookDispatcher.HttpClientName, client =>
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ChangeMyVoice-Webhook/1"))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<WebhookDispatcher>();
+builder.Services.AddSingleton<IJobNotifier>(sp => sp.GetRequiredService<WebhookDispatcher>());
 
 builder.Services.AddSingleton<IServiceInstance, ServiceInstance>();
 builder.Services.AddSingleton<IJobQueue>(sp =>
@@ -128,6 +142,7 @@ builder.Services.AddHostedService<InferenceReadinessService>();
 builder.Services.AddHostedService<StartupRecoveryService>();
 builder.Services.AddHostedService<JobJanitorService>();
 builder.Services.AddHostedService<ConversionWorker>();
+builder.Services.AddHostedService<WebhookDeliveryService>();
 
 // Beim Herunterfahren etwas Luft lassen, damit laufende Aufträge noch ordentlich
 // als unterbrochen vermerkt werden können.

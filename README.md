@@ -39,6 +39,7 @@ src/
 ├── ChangeMyVoice.Adapters.Persistence/ SQLite
 ├── ChangeMyVoice.Adapters.Storage/     Dateisystem
 ├── ChangeMyVoice.Adapters.Inference/   ffmpeg, ffprobe, Python-Prozess
+├── ChangeMyVoice.Adapters.Notifications/ Webhook-Aufrufe beim Ende eines Auftrags
 ├── ChangeMyVoice.Api/                  HTTP, Absicherung, Hintergrunddienste
 └── ChangeMyVoice.Gateway/              Weiterleitung, im Container
 ```
@@ -83,12 +84,50 @@ curl -X POST http://mac:5080/api/v1/voices -H "X-Api-Key: $KEY" \
 curl -X POST http://mac:5080/api/v1/jobs -H "X-Api-Key: $KEY" \
      -F "voiceId=<id>" -F "source=@gesang.wav"
 
-# 3. Status abfragen, bis COMPLETED
+# 3. Status abfragen, bis COMPLETED (oder beim Senden -F "webhookUrl=https://…"
+#    angeben und auf den Aufruf warten, siehe unten)
 curl http://mac:5080/api/v1/jobs/<jobId> -H "X-Api-Key: $KEY"
 
 # 4. Ergebnis holen
 curl http://mac:5080/api/v1/jobs/<jobId>/result -H "X-Api-Key: $KEY" -o ergebnis.wav
 ```
+
+### Benachrichtigung statt Abfragen
+
+Wer beim Senden eines Auftrags `webhookUrl` mitgibt, muss nicht alle paar
+Sekunden nachfragen: Sobald der Auftrag `COMPLETED`, `FAILED` oder `CANCELLED`
+ist, schickt der Dienst einen `POST` mit JSON an diese Adresse:
+
+```json
+{
+  "event": "job.finished",
+  "jobId": "…",
+  "status": "COMPLETED",
+  "voiceId": "…",
+  "finishedAtUtc": "2026-09-26T17:02:11+00:00",
+  "error": null,
+  "statusUrl": "/api/v1/jobs/…",
+  "resultUrl": "/api/v1/jobs/…/result",
+  "resultSizeBytes": 5760044,
+  "resultSha256": "…"
+}
+```
+
+Der Kopf `X-ChangeMyVoice-Event: job.finished` nennt die Art. Antwortet der
+Empfänger nicht mit 2xx, wird bei Zeitablauf, 408, 429 und 5xx wiederholt
+(voreingestellt vier Versuche, nach 30 s, 1 und 2 Minuten); andere Antworten und
+Weiterleitungen gelten als endgültige Ablehnung.
+
+Die Nachricht ist **nicht signiert** und bewusst nur ein Anstoß: Der Empfänger
+fragt daraufhin `GET /api/v1/jobs/{id}` ab, und nur das ist verbindlich. Ein
+gefälschter Aufruf löst so höchstens eine Abfrage aus. Nachrichten, die bei
+einem Neustart noch unterwegs sind, gehen verloren; wer ganz sicher gehen will,
+fragt nach der geschätzten Rechenzeit (`estimatedDurationSeconds`) einmal nach.
+
+Der Aufruf kommt vom Mac, nicht vom Gateway. Die Adresse muss also von dort aus
+erreichbar sein. Mit `Webhooks:AllowedHosts` lässt sich festlegen, welche
+Rechner überhaupt angegeben werden dürfen (leer heißt: jeder); weitere
+Einstellungen unter `Webhooks` sind `Timeout`, `MaxAttempts` und `RetryDelay`.
 
 ## Audio-Formate
 
@@ -293,6 +332,10 @@ sich nur an einer tatsächlich umgewandelten Datei nachmessen.
   Systemkontext nicht verlässlich nutzbar. Für einen dauerhaft erreichbaren
   Dienst sind automatische Anmeldung und `sudo pmset -a sleep 0 disablesleep 1`
   Teil der Einrichtung.
+- **Webhooks ins lokale Netz.** Ein Dienst, den launchd startet, darf unter
+  macOS nicht ohne Weiteres Adressen im lokalen Netz aufrufen (Berechtigung
+  „Lokales Netzwerk“; bei YuE UI auf demselben Mac endete das mit „No route to
+  host“). `127.0.0.1` und Tailscale-Adressen sind davon nicht betroffen.
 - **Netzweg Proxmox → Mac.** Die Freigabeliste muss die Adresse treffen, mit der
   der Container tatsächlich ankommt — bei Bridge-Netzwerk die des Proxmox-Knotens,
   nicht die des Containers.

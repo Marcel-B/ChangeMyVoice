@@ -93,7 +93,7 @@ builder.Services.AddHttpClient("changemyvoice", client =>
 | Stimme löschen | `DELETE /api/v1/voices/{id}` |
 | Übersicht der Aufträge | `GET /api/v1/jobs?limit=50&offset=0` |
 | Nur laufende zeigen | `GET /api/v1/jobs?status=RUNNING` |
-| Auftrag starten | `POST /api/v1/jobs` (multipart: `source`, `voiceId`) |
+| Auftrag starten | `POST /api/v1/jobs` (multipart: `source`, `voiceId`, optional `webhookUrl`) |
 | Fortschritt | `GET /api/v1/jobs/{id}` |
 | Ergebnis | `GET /api/v1/jobs/{id}/result` |
 | Abbrechen | `DELETE /api/v1/jobs/{id}` |
@@ -101,9 +101,15 @@ builder.Services.AddHttpClient("changemyvoice", client =>
 Für die Übersicht liefert `GET /api/v1/jobs` neben `items` auch `total`, womit
 sich eine Blätterung anzeigen lässt. Die jüngsten Aufträge stehen zuoberst.
 
-**Zum Fortschritt:** Es gibt keine Benachrichtigung, die Oberfläche fragt den
-Zustand ab. Ein Abstand von fünf bis zehn Sekunden reicht, häufigeres Fragen
-bringt nichts und zählt gegen das Ratenlimit.
+**Zum Fortschritt:** Entweder fragt die Oberfläche den Zustand ab — ein Abstand
+von fünf bis zehn Sekunden reicht, häufigeres Fragen bringt nichts und zählt
+gegen das Ratenlimit — oder sie gibt beim Anlegen `webhookUrl` mit. Dann ruft
+der Dienst diese Adresse per `POST` auf, sobald der Auftrag `COMPLETED`,
+`FAILED` oder `CANCELLED` ist; Aufbau der Nachricht und Wiederholungen stehen
+im README unter „Benachrichtigung statt Abfragen“. Die Nachricht ist nicht
+signiert: Nimm sie als Anlass, `GET /api/v1/jobs/{id}` abzufragen, und
+verlass dich auf dessen Antwort. Der Aufruf kommt vom Mac, die Adresse muss
+also von dort erreichbar sein (etwa über Tailscale).
 
 Die Antwort auf `POST /api/v1/jobs` enthält `estimatedDurationSeconds`. Zeig den
 Wert an — die Läufe dauern lange, und ohne Angabe wirkt der Dienst hängen

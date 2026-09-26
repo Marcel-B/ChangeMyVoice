@@ -254,6 +254,13 @@
           "voiceLabel": {
             "description": "Deren Bezeichnung bei Annahme des Auftrags.",
             "type": "string"
+          },
+          "webhookUrl": {
+            "description": "Die Adresse, die beim Ende des Auftrags aufgerufen wird, falls beim Anlegen\neine angegeben wurde.",
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "required": [
@@ -436,7 +443,7 @@
         ]
       },
       "post": {
-        "description": "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt erhalten, das Timbre stammt aus der Referenz.\n\nStandardmäßig läuft die Konvertierung im Gesangspfad: 44,1 kHz mit Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere Sprachpfad bei 22,05 kHz.",
+        "description": "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt erhalten, das Timbre stammt aus der Referenz.\n\nStandardmäßig läuft die Konvertierung im Gesangspfad: 44,1 kHz mit Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere Sprachpfad bei 22,05 kHz.\n\nMit 'webhookUrl' (absolute http- oder https-Adresse) ruft der Dienst diese Adresse per POST auf, sobald der Auftrag COMPLETED, FAILED oder CANCELLED ist, statt dass der Aufrufer alle paar Sekunden nachfragt. Der Rumpf ist JSON mit 'event' (\"job.finished\"), 'jobId', 'status', 'voiceId', 'finishedAtUtc', 'error', 'statusUrl', 'resultUrl', 'resultSizeBytes' und 'resultSha256'; der Kopf 'X-ChangeMyVoice-Event' nennt die Art. Antwortet der Empfänger nicht mit 2xx, wird bei Zeitablauf, 408, 429 und 5xx mit wachsendem Abstand wiederholt. Die Nachricht ist nicht signiert und nur ein Anstoß: Verbindlich bleibt der Status, den der Empfänger daraufhin abfragt.",
         "operationId": "SubmitConversionJob",
         "requestBody": {
           "content": {
@@ -523,6 +530,14 @@
                           "integer",
                           "string"
                         ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "webhookUrl": {
+                        "type": "string"
                       }
                     },
                     "type": "object"

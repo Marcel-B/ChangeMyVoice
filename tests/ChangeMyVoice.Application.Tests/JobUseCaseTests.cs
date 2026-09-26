@@ -234,16 +234,20 @@ public class ProcessConversionJobTests
     private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero));
 
     private readonly FakeAudioNormalizer _normalizer = new();
+    private readonly FakeJobNotifier _notifier = new();
+
+    private static readonly WebhookUrl Webhook =
+        WebhookUrl.Rehydrate("https://yue.example/api/voice/done");
 
     private ProcessConversionJob Sut() => new(
-        _jobs, _workspaces, _engine, _normalizer, _instance, _clock,
+        _jobs, _workspaces, _engine, _normalizer, _instance, _notifier, _clock,
         NullLogger<ProcessConversionJob>.Instance);
 
-    private async Task<ConversionJob> GivenQueuedJob()
+    private async Task<ConversionJob> GivenQueuedJob(WebhookUrl? webhook = null)
     {
         var job = ConversionJob.Create(
             JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default,
-            _clock.GetUtcNow(), _instance.InstanceId);
+            _clock.GetUtcNow(), _instance.InstanceId, webhookUrl: webhook);
         await _jobs.SaveAsync(job);
         return job;
     }
@@ -353,5 +357,83 @@ public class ProcessConversionJobTests
 
         _engine.Calls.ShouldBeEmpty();
         (await _jobs.FindAsync(job.Id))!.Status.ShouldBe(JobStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task Ein_fertiger_Auftrag_meldet_sich_an_seiner_Adresse()
+    {
+        var job = await GivenQueuedJob(Webhook);
+        _workspaces.SetOutput(job.Id, [1, 2, 3, 4]);
+
+        await Sut().ExecuteAsync(job.Id);
+
+        var sent = _notifier.Sent.ShouldHaveSingleItem();
+        sent.Target.ShouldBe(Webhook);
+        sent.Job.Status.ShouldBe(JobStatus.Completed);
+        sent.Job.IsResultAvailable.ShouldBeTrue();
+        sent.Job.OutputSizeBytes.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task Ein_fehlgeschlagener_Auftrag_meldet_sich_ebenfalls()
+    {
+        var job = await GivenQueuedJob(Webhook);
+        _engine.Outcome = ConversionOutcome.Failure(
+            ConversionErrorCode.OutOfMemory, "kein Speicher");
+
+        await Sut().ExecuteAsync(job.Id);
+
+        var sent = _notifier.Sent.ShouldHaveSingleItem();
+        sent.Job.Status.ShouldBe(JobStatus.Failed);
+        sent.Job.Error!.Code.ShouldBe(ConversionErrorCode.OutOfMemory);
+    }
+
+    [Fact]
+    public async Task Eine_unerwartete_Ausnahme_wird_gemeldet()
+    {
+        var job = await GivenQueuedJob(Webhook);
+        _engine.ThrowOnConvert = new InvalidOperationException("Boom");
+
+        await Sut().ExecuteAsync(job.Id);
+
+        _notifier.Sent.ShouldHaveSingleItem().Job.Status.ShouldBe(JobStatus.Failed);
+    }
+
+    [Fact]
+    public async Task Ohne_Adresse_wird_nichts_gemeldet()
+    {
+        var job = await GivenQueuedJob();
+        _workspaces.SetOutput(job.Id, [1]);
+
+        await Sut().ExecuteAsync(job.Id);
+
+        _notifier.Sent.ShouldBeEmpty();
+    }
+}
+
+public class CancelJobTests
+{
+    private readonly InMemoryConversionJobRepository _jobs = new();
+    private readonly FakeJobWorkspaceStore _workspaces = new();
+    private readonly FakeJobNotifier _notifier = new();
+    private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero));
+
+    private CancelJob Sut() => new(_jobs, _workspaces, _notifier, _clock);
+
+    [Fact]
+    public async Task Ein_Abbruch_wird_genau_einmal_gemeldet()
+    {
+        // Der Abbruch ist wiederholbar; der Empfaenger soll trotzdem nur einen
+        // Anstoss bekommen.
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default,
+            _clock.GetUtcNow(), Guid.NewGuid(),
+            webhookUrl: WebhookUrl.Rehydrate("https://yue.example/hook"));
+        await _jobs.SaveAsync(job);
+
+        (await Sut().ExecuteAsync(job.Id)).IsSuccess.ShouldBeTrue();
+        (await Sut().ExecuteAsync(job.Id)).IsSuccess.ShouldBeTrue();
+
+        _notifier.Sent.ShouldHaveSingleItem().Job.Status.ShouldBe(JobStatus.Cancelled);
     }
 }
