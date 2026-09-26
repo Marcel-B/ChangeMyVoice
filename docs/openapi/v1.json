@@ -443,7 +443,7 @@
         ]
       },
       "post": {
-        "description": "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt erhalten, das Timbre stammt aus der Referenz.\n\nStandardmäßig läuft die Konvertierung im Gesangspfad: 44,1 kHz mit Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere Sprachpfad bei 22,05 kHz.\n\nMit 'webhookUrl' (absolute http- oder https-Adresse) ruft der Dienst diese Adresse per POST auf, sobald der Auftrag COMPLETED, FAILED oder CANCELLED ist, statt dass der Aufrufer alle paar Sekunden nachfragt. Der Rumpf ist JSON mit 'event' (\"job.finished\"), 'jobId', 'status', 'voiceId', 'finishedAtUtc', 'error', 'statusUrl', 'resultUrl', 'resultSizeBytes' und 'resultSha256'; der Kopf 'X-ChangeMyVoice-Event' nennt die Art. Antwortet der Empfänger nicht mit 2xx, wird bei Zeitablauf, 408, 429 und 5xx mit wachsendem Abstand wiederholt. Die Nachricht ist nicht signiert und nur ein Anstoß: Verbindlich bleibt der Status, den der Empfänger daraufhin abfragt.",
+        "description": "Nimmt die zu konvertierende Aufnahme entgegen und startet den Auftrag mit der angegebenen Referenzstimme. Die Antwort kommt sofort; der Fortschritt wird über den Status abgefragt. Die Gesangsdarbietung der Quelle bleibt erhalten, das Timbre stammt aus der Referenz.\n\nStandardmäßig läuft die Konvertierung im Gesangspfad: 44,1 kHz mit Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere Sprachpfad bei 22,05 kHz.\n\nIm Gesangspfad verschiebt 'semiToneShift' (-24 bis 24) die Tonhöhe um ganze Halbtöne; unter der ursprünglichen Begleitung bleiben nur ganze Oktaven (±12) in der Tonart. 'autoF0Adjust=true' legt die Tonlage der Quelle auf die der Referenz, um einen beliebigen Betrag. Beides ist ohne F0-Konditionierung ein Fehler (400).\n\nMit 'webhookUrl' (absolute http- oder https-Adresse) ruft der Dienst diese Adresse per POST auf, sobald der Auftrag COMPLETED, FAILED oder CANCELLED ist, statt dass der Aufrufer alle paar Sekunden nachfragt. Der Rumpf ist JSON mit 'event' (\"job.finished\"), 'jobId', 'status', 'voiceId', 'finishedAtUtc', 'error', 'statusUrl', 'resultUrl', 'resultSizeBytes' und 'resultSha256'; der Kopf 'X-ChangeMyVoice-Event' nennt die Art. Antwortet der Empfänger nicht mit 2xx, wird bei Zeitablauf, 408, 429 und 5xx mit wachsendem Abstand wiederholt. Die Nachricht ist nicht signiert und nur ein Anstoß: Verbindlich bleibt der Status, den der Empfänger daraufhin abfragt.",
         "operationId": "SubmitConversionJob",
         "requestBody": {
           "content": {
@@ -530,6 +530,27 @@
                           "integer",
                           "string"
                         ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "semiToneShift": {
+                        "format": "int32",
+                        "pattern": "^-?(?:0|[1-9]\\d*)$",
+                        "type": [
+                          "integer",
+                          "string"
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "autoF0Adjust": {
+                        "type": "boolean"
                       }
                     },
                     "type": "object"

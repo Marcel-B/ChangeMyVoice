@@ -156,7 +156,7 @@ public class TargetAudioFormatTests
     [Fact]
     public void Der_Sprachpfad_laesst_sich_ausdruecklich_waehlen()
     {
-        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null,
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, null, null,
             out var options, out _).ShouldBeTrue();
 
         options.TargetFormat.SampleRate.ShouldBe(22050);

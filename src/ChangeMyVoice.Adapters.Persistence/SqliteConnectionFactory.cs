@@ -101,7 +101,9 @@ public sealed class SqliteConnectionFactory
                 artifacts_purged     INTEGER NOT NULL DEFAULT 0,
                 source_length_ms     INTEGER NOT NULL DEFAULT 0,
                 output_sample_rate   INTEGER NOT NULL DEFAULT 48000,
-                webhook_url          TEXT NULL
+                webhook_url          TEXT NULL,
+                semi_tone_shift      INTEGER NOT NULL DEFAULT 0,
+                auto_f0_adjust       INTEGER NOT NULL DEFAULT 0
             );
 
             -- Nachtraeglich ergaenzt; bestehende Datenbanken bekommen die Spalte
@@ -116,6 +118,8 @@ public sealed class SqliteConnectionFactory
         EnsureColumn(connection, "conversion_jobs", "source_length_ms", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn(connection, "conversion_jobs", "output_sample_rate", "INTEGER NOT NULL DEFAULT 48000");
         EnsureColumn(connection, "conversion_jobs", "webhook_url", "TEXT NULL");
+        EnsureColumn(connection, "conversion_jobs", "semi_tone_shift", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "conversion_jobs", "auto_f0_adjust", "INTEGER NOT NULL DEFAULT 0");
     }
 
     /// <summary>

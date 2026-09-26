@@ -165,6 +165,20 @@ public class WorkflowTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Eine_Verschiebung_ohne_F0_Konditionierung_wird_abgelehnt()
+    {
+        var client = factory.CreateAuthenticatedClient();
+        var upload = JobUpload(Guid.NewGuid().ToString(), [1, 2, 3]);
+        upload.Add(new StringContent("false"), "f0Condition");
+        upload.Add(new StringContent("12"), "semiToneShift");
+
+        var response = await client.PostAsync("/api/v1/jobs", upload);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("INVALID_INPUT");
+    }
+
+    [Fact]
     public async Task Eine_Datei_ohne_Audio_wird_abgelehnt_und_erzeugt_keinen_Auftrag()
     {
         var client = factory.CreateAuthenticatedClient();

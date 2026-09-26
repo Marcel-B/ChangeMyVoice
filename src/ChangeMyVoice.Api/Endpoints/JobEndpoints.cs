@@ -28,6 +28,11 @@ internal static class JobEndpoints
                 + "Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 "
                 + "Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere "
                 + "Sprachpfad bei 22,05 kHz.\n\n"
+                + "Im Gesangspfad verschiebt 'semiToneShift' (-24 bis 24) die Tonhöhe um "
+                + "ganze Halbtöne; unter der ursprünglichen Begleitung bleiben nur ganze "
+                + "Oktaven (±12) in der Tonart. 'autoF0Adjust=true' legt die Tonlage der "
+                + "Quelle auf die der Referenz, um einen beliebigen Betrag. Beides ist ohne "
+                + "F0-Konditionierung ein Fehler (400).\n\n"
                 + "Mit 'webhookUrl' (absolute http- oder https-Adresse) ruft der Dienst "
                 + "diese Adresse per POST auf, sobald der Auftrag COMPLETED, FAILED oder "
                 + "CANCELLED ist, statt dass der Aufrufer alle paar Sekunden nachfragt. "
@@ -103,6 +108,8 @@ internal static class JobEndpoints
         [FromForm] bool? f0Condition,
         [FromForm] bool? fp16,
         [FromForm] int? outputSampleRate,
+        [FromForm] int? semiToneShift,
+        [FromForm] bool? autoF0Adjust,
         [FromForm] string? webhookUrl,
         ISubmitConversionJob useCase,
         FileSystemJobWorkspaceStore workspaces,
@@ -116,7 +123,7 @@ internal static class JobEndpoints
 
         if (!ConversionOptions.TryCreate(
                 diffusionSteps, inferenceCfgRate, lengthAdjust, f0Condition, fp16,
-                outputSampleRate, out var options, out var optionsError))
+                outputSampleRate, semiToneShift, autoF0Adjust, out var options, out var optionsError))
         {
             return TypedResults.Problem(
                 detail: optionsError,

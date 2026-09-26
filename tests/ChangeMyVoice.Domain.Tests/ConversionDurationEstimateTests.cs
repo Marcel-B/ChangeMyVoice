@@ -149,7 +149,7 @@ public class OutputSampleRateTests
     [Fact]
     public void Wer_die_Modellrate_will_bekommt_sie_unveraendert()
     {
-        ConversionOptions.TryCreate(null, null, null, null, null, 44100, out var options, out _)
+        ConversionOptions.TryCreate(null, null, null, null, null, 44100, null, null, out var options, out _)
             .ShouldBeTrue();
 
         options.OutputSampleRate.ShouldBe(44100);
@@ -163,7 +163,7 @@ public class OutputSampleRateTests
     [InlineData(96000)]
     public void Uebliche_Raten_werden_angenommen(int rate)
     {
-        ConversionOptions.TryCreate(null, null, null, null, null, rate, out var options, out _)
+        ConversionOptions.TryCreate(null, null, null, null, null, rate, null, null, out var options, out _)
             .ShouldBeTrue();
 
         options.OutputSampleRate.ShouldBe(rate);
@@ -175,7 +175,7 @@ public class OutputSampleRateTests
     [InlineData(500000)]
     public void Unsinnige_Raten_werden_abgelehnt(int rate)
     {
-        ConversionOptions.TryCreate(null, null, null, null, null, rate, out _, out var error)
+        ConversionOptions.TryCreate(null, null, null, null, null, rate, null, null, out _, out var error)
             .ShouldBeFalse();
 
         error.ShouldNotBeNull();
@@ -186,11 +186,55 @@ public class OutputSampleRateTests
     {
         // Er erzeugt 22,05 kHz -- ohne Umrechnung waere die Datei fuer ein
         // Projekt noch weniger brauchbar als mit 44,1 kHz.
-        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null,
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, null, null,
             out var options, out _).ShouldBeTrue();
 
         options.TargetFormat.SampleRate.ShouldBe(22050);
         options.RequiresOutputConversion.ShouldBeTrue();
         options.DeliveryFormat.SampleRate.ShouldBe(48000);
+    }
+
+    [Fact]
+    public void Ohne_Angabe_wird_die_Tonhoehe_nicht_veraendert()
+    {
+        ConversionOptions.Default.SemiToneShift.ShouldBe(0);
+        ConversionOptions.Default.AutoF0Adjust.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(-12)]
+    [InlineData(7)]
+    [InlineData(24)]
+    public void Halbtoene_werden_im_Gesangspfad_angenommen(int shift)
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, null, shift, true, out var options, out _)
+            .ShouldBeTrue();
+
+        options.SemiToneShift.ShouldBe(shift);
+        options.AutoF0Adjust.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(-25)]
+    [InlineData(25)]
+    public void Zu_grosse_Verschiebungen_werden_abgelehnt(int shift)
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, null, shift, null, out _, out var error)
+            .ShouldBeFalse();
+
+        error.ShouldNotBeNull().ShouldContain("semiToneShift");
+    }
+
+    [Theory]
+    [InlineData(12, null)]
+    [InlineData(null, true)]
+    public void Ohne_F0_Konditionierung_gibt_es_nichts_zu_verschieben(int? shift, bool? adjust)
+    {
+        // Still ignoriert haette der Aufrufer ein Ergebnis in der falschen Lage
+        // und keine Erklaerung dafuer.
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, shift, adjust,
+            out _, out var error).ShouldBeFalse();
+
+        error.ShouldNotBeNull().ShouldContain("f0Condition");
     }
 }

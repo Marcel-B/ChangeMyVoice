@@ -30,6 +30,30 @@ public sealed record ConversionOptions
     /// </remarks>
     public bool F0Condition { get; private init; } = true;
 
+    /// <summary>
+    /// Um wie viele Halbtöne die Tonhöhe der Quelle verschoben wird.
+    /// </summary>
+    /// <remarks>
+    /// Verschoben wird der Tonhöhenverlauf, den das Modell als Vorgabe bekommt,
+    /// nicht das fertige Audio; das Timbre bleibt deshalb unverfälscht. Das geht
+    /// nur im Gesangspfad, der Sprachpfad kennt keine Tonhöhenvorgabe. Wer das
+    /// Ergebnis wieder unter die ursprüngliche Begleitung legt, bleibt nur mit
+    /// ganzen Oktaven (±12) in der Tonart.
+    /// </remarks>
+    public int SemiToneShift { get; private init; }
+
+    /// <summary>
+    /// Ob die Tonlage der Quelle an die der Referenz angeglichen wird.
+    /// </summary>
+    /// <remarks>
+    /// Der Median der Tonhöhe wird auf den der Referenz gelegt, etwa damit eine
+    /// Männerstimme als Quelle nicht zu tief für eine Frauenreferenz ist. Das
+    /// verschiebt um einen beliebigen, nicht ganzzahligen Betrag und verlässt
+    /// damit die Tonart der Begleitung; für Gesang, der wieder unter die
+    /// Begleitung soll, bleibt es deshalb aus. Nur im Gesangspfad.
+    /// </remarks>
+    public bool AutoF0Adjust { get; private init; }
+
     /// <summary>Ob der Diffusionsschritt in halber Genauigkeit läuft.</summary>
     public bool Fp16 { get; private init; } = true;
 
@@ -69,6 +93,8 @@ public sealed record ConversionOptions
         bool? f0Condition,
         bool? fp16,
         int? outputSampleRate,
+        int? semiToneShift,
+        bool? autoF0Adjust,
         out ConversionOptions options,
         out string? error)
     {
@@ -106,14 +132,34 @@ public sealed record ConversionOptions
             return false;
         }
 
+        var f0 = f0Condition ?? Default.F0Condition;
+        var shift = semiToneShift ?? Default.SemiToneShift;
+        if (shift is < -24 or > 24)
+        {
+            error = "semiToneShift muss zwischen -24 und 24 liegen.";
+            return false;
+        }
+
+        var adjust = autoF0Adjust ?? Default.AutoF0Adjust;
+
+        // Ohne F0-Konditionierung gibt es keinen Tonhöhenverlauf, den man
+        // verschieben könnte; der Wert bliebe still wirkungslos.
+        if (!f0 && (shift != 0 || adjust))
+        {
+            error = "semiToneShift und autoF0Adjust wirken nur mit f0Condition=true.";
+            return false;
+        }
+
         options = new ConversionOptions
         {
             OutputSampleRate = ausgaberate,
             DiffusionSteps = steps,
             InferenceCfgRate = cfg,
             LengthAdjust = length,
-            F0Condition = f0Condition ?? Default.F0Condition,
+            F0Condition = f0,
             Fp16 = fp16 ?? Default.Fp16,
+            SemiToneShift = shift,
+            AutoF0Adjust = adjust,
         };
 
         return true;

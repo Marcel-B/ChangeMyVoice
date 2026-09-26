@@ -71,7 +71,7 @@ public class SubmitConversionJobTests
     public async Task Im_Sprachpfad_wird_auf_22050_Hz_normalisiert()
     {
         var voiceId = await GivenVoice();
-        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, out var options, out _)
+        ConversionOptions.TryCreate(null, null, null, f0Condition: false, null, null, null, null, out var options, out _)
             .ShouldBeTrue();
 
         await Sut().ExecuteAsync(new SubmitConversionJobCommand(voiceId, Upload, options));

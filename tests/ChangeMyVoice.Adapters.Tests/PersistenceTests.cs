@@ -257,7 +257,7 @@ public class SqliteConversionJobRepositoryTests : IDisposable
     [Fact]
     public async Task Die_Einstellungen_des_Laufs_bleiben_erhalten()
     {
-        ConversionOptions.TryCreate(80, 0.5, 1.2, true, false, null, out var options, out _);
+        ConversionOptions.TryCreate(80, 0.5, 1.2, true, false, null, null, null, out var options, out _);
         var job = ConversionJob.Create(
             JobId.New(), VoiceId.New(), "Anna", options, Now, Instance);
 
@@ -269,6 +269,20 @@ public class SqliteConversionJobRepositoryTests : IDisposable
         loaded.Options.Fp16.ShouldBeFalse();
         // Und damit auch die Zielrate des Gesangspfads.
         loaded.Options.TargetFormat.SampleRate.ShouldBe(44100);
+    }
+
+    [Fact]
+    public async Task Die_Tonhoehenverschiebung_bleibt_erhalten()
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, null, 12, true, out var options, out _);
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", options, Now, Instance);
+
+        await _sut.SaveAsync(job);
+        var loaded = await _sut.FindAsync(job.Id);
+
+        loaded!.Options.SemiToneShift.ShouldBe(12);
+        loaded.Options.AutoF0Adjust.ShouldBeTrue();
     }
 
     public void Dispose() => _fixture.Dispose();
