@@ -8,6 +8,25 @@ auf die Standardausgabe:
     {"status": "ok", "modelLoadMs": 41230, "inferenceMs": 8120}
     {"status": "error", "code": "OUT_OF_MEMORY", "message": "..."}
 
+Mit --serve bleibt das Modell zwischen den Auftraegen geladen (init.md
+Paragraph 22). Die Modellschalter (--f0-condition, --no-fp16) gelten dann fuer
+den ganzen Prozess, denn sie bestimmen, welcher Checkpoint geladen wird. Nach
+dem Laden kommt eine Zeile
+
+    {"status": "ready", "modelLoadMs": 41230}
+
+danach je Auftrag eine JSON-Zeile auf der Standardeingabe
+
+    {"source": "...", "reference": "...", "output": "...", "diffusionSteps": 50,
+     "inferenceCfgRate": 0.7, "lengthAdjust": 1.0, "semiToneShift": 0,
+     "autoF0Adjust": false}
+
+und als Antwort genau eine Zeile wie oben (mit "modelLoadMs": 0). Das Ende der
+Standardeingabe beendet den Prozess; der Dienst entlaedt das Modell, indem er
+sie schliesst oder den Prozess beendet. Was Bibliotheken auf die
+Standardausgabe schreiben, landet in diesem Modus auf der Fehlerausgabe, damit
+die Antwortzeilen die einzigen auf der Standardausgabe bleiben.
+
 Die Zuordnung zu den Fehlercodes aus init.md Paragraph 24 passiert hier, weil
 Python die Ausnahmen kennt. Der .NET-Adapter hat zusaetzlich eine grobe
 Ersatzzuordnung ueber die Fehlerausgabe, falls dieses Skript gar nicht erst
@@ -25,6 +44,7 @@ venv und Seed-VCs Checkpoints; neu geladen wird nichts.
 """
 
 import argparse
+import gc
 import json
 import os
 import sys
@@ -41,10 +61,15 @@ MPS_ERROR = "MPS_ERROR"
 OUTPUT_NOT_CREATED = "OUTPUT_NOT_CREATED"
 
 
+# Wohin die Antwortzeilen gehen; im Dauerbetrieb eine Kopie der urspruenglichen
+# Standardausgabe (siehe serve).
+_protocol = sys.stdout
+
+
 def emit(payload):
-    """Schreibt genau eine JSON-Zeile und beendet den Lauf."""
-    sys.stdout.write(json.dumps(payload) + "\n")
-    sys.stdout.flush()
+    """Schreibt genau eine JSON-Zeile."""
+    _protocol.write(json.dumps(payload) + "\n")
+    _protocol.flush()
 
 
 def fail(code, message):
@@ -75,9 +100,11 @@ def classify(exc):
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Singing Voice Conversion ueber Seed-VC.")
-    parser.add_argument("--source", required=True)
-    parser.add_argument("--reference", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--serve", action="store_true",
+                        help="Modell geladen halten und Auftraege zeilenweise von stdin lesen.")
+    parser.add_argument("--source")
+    parser.add_argument("--reference")
+    parser.add_argument("--output")
     # Nur noch aus Kompatibilitaet zum Aufruf des Dienstes; es gibt nur Seed-VC.
     parser.add_argument("--backend", default="seed-vc")
     parser.add_argument("--diffusion-steps", type=int, default=50)
@@ -122,8 +149,17 @@ def seed_vc_path():
     return os.path.abspath(path)
 
 
+# Nur fuer die Tests des Dienstes: Statt Seed-VC zu laden, wird die Quelle als
+# Ergebnis kopiert. So pruefen sie das echte Protokoll dieses Skripts auf einem
+# Rechner ohne Modell, ohne Torch und ohne Apple Silicon.
+FAKE_MODEL = os.environ.get("CHANGEMYVOICE_FAKE_MODEL") == "1"
+
+
 def load(args):
     """Laedt Seed-VC und liefert die Modellteile samt Geraet."""
+    if FAKE_MODEL:
+        return None, None
+
     root = seed_vc_path()
     if not os.path.isdir(root):
         raise FileNotFoundError("Seed-VC fehlt unter %s (checkpoint)" % root)
@@ -144,6 +180,12 @@ def load(args):
 
 
 def convert(args, inference, parts):
+    if FAKE_MODEL:
+        import shutil
+
+        shutil.copyfile(args.source, args.output)
+        return
+
     import librosa
     import numpy as np
     import soundfile
@@ -263,30 +305,34 @@ def convert(args, inference, parts):
     soundfile.write(args.output, np.concatenate(waves), sr)
 
 
-def main():
-    args = build_parser().parse_args()
-
+def check_inputs(args):
+    """Liefert (Code, Meldung), wenn der Auftrag so nicht laufen kann, sonst None."""
     for label, path in (("source", args.source), ("reference", args.reference)):
-        if not os.path.isfile(path):
-            fail(INVALID_AUDIO, "Die Datei fuer %s fehlt: %s" % (label, path))
+        if not path or not os.path.isfile(path):
+            return INVALID_AUDIO, "Die Datei fuer %s fehlt: %s" % (label, path)
 
-    if args.backend != "seed-vc":
-        fail(MODEL_LOAD_FAILED, "Unbekanntes Backend: %s" % args.backend)
+    if not args.output:
+        return OUTPUT_NOT_CREATED, "Es ist kein Ausgabeort angegeben."
 
     if not args.f0_condition and (args.semi_tone_shift != 0 or args.auto_f0_adjust):
-        fail(INFERENCE_FAILED, "Tonhoehenverschiebung gibt es nur mit --f0-condition.")
+        return INFERENCE_FAILED, "Tonhoehenverschiebung gibt es nur mit --f0-condition."
 
-    started = time.perf_counter()
+    return None
 
+
+def load_classified(args):
+    """Laedt das Modell; ein Fehler wird gemeldet und beendet den Prozess."""
     try:
-        inference, parts = load(args)
+        return load(args)
     except Exception as exc:
         traceback.print_exc(file=sys.stderr)
         code = classify(exc)
         fail(code if code in (MODEL_DOWNLOAD_FAILED, OUT_OF_MEMORY, MPS_ERROR) else MODEL_LOAD_FAILED, exc)
-        return
 
-    model_loaded = time.perf_counter()
+
+def run_job(args, inference, parts, model_load_ms):
+    """Rechnet einen Auftrag und liefert die Antwortzeile."""
+    started = time.perf_counter()
 
     try:
         convert(args, inference, parts)
@@ -294,19 +340,108 @@ def main():
         # Der vollstaendige Traceback gehoert ins Log des Dienstes, nicht in die
         # Antwort an den Aufrufer (init.md Paragraph 24).
         traceback.print_exc(file=sys.stderr)
-        fail(classify(exc), exc)
-        return
+        return {"status": "error", "code": classify(exc), "message": str(exc)[:2000]}
 
     finished = time.perf_counter()
 
     if not os.path.isfile(args.output) or os.path.getsize(args.output) < 100:
-        fail(OUTPUT_NOT_CREATED, "Es entstand keine verwertbare Ausgabedatei.")
+        return {"status": "error", "code": OUTPUT_NOT_CREATED,
+                "message": "Es entstand keine verwertbare Ausgabedatei."}
 
-    emit({
+    return {
         "status": "ok",
-        "modelLoadMs": int((model_loaded - started) * 1000),
-        "inferenceMs": int((finished - model_loaded) * 1000),
-    })
+        "modelLoadMs": model_load_ms,
+        "inferenceMs": int((finished - started) * 1000),
+    }
+
+
+def job_args(base, request):
+    """Die Argumente eines Auftrags im Dauerbetrieb; die Modellschalter bleiben."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        source=request.get("source"),
+        reference=request.get("reference"),
+        output=request.get("output"),
+        diffusion_steps=int(request.get("diffusionSteps", 50)),
+        inference_cfg_rate=float(request.get("inferenceCfgRate", 0.7)),
+        length_adjust=float(request.get("lengthAdjust", 1.0)),
+        semi_tone_shift=int(request.get("semiToneShift", 0)),
+        auto_f0_adjust=bool(request.get("autoF0Adjust", False)),
+        f0_condition=base.f0_condition,
+        no_fp16=base.no_fp16,
+    )
+
+
+def release_memory():
+    """Gibt die Zwischenergebnisse eines Auftrags frei; das Modell bleibt."""
+    gc.collect()
+    try:
+        import torch
+
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception:  # pragma: no cover - haengt an der Umgebung
+        pass
+
+
+def serve(args):
+    global _protocol
+
+    # Die Antwortzeilen bekommen eine eigene Kopie der Standardausgabe; alles
+    # andere, auch was C-Erweiterungen direkt auf den Deskriptor 1 schreiben
+    # (inference.py meldet etwa sein fp16), geht auf die Fehlerausgabe.
+    _protocol = os.fdopen(os.dup(1), "w")
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
+
+    started = time.perf_counter()
+    inference, parts = load_classified(args)
+    emit({"status": "ready", "modelLoadMs": int((time.perf_counter() - started) * 1000)})
+
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            request = json.loads(line)
+            job = job_args(args, request)
+        except (ValueError, TypeError, AttributeError) as exc:
+            emit({"status": "error", "code": INFERENCE_FAILED, "message": "Ungueltiger Auftrag: %s" % exc})
+            continue
+
+        problem = check_inputs(job)
+        if problem:
+            emit({"status": "error", "code": problem[0], "message": problem[1]})
+            continue
+
+        emit(run_job(job, inference, parts, 0))
+        release_memory()
+
+
+def main():
+    args = build_parser().parse_args()
+
+    if args.backend != "seed-vc":
+        fail(MODEL_LOAD_FAILED, "Unbekanntes Backend: %s" % args.backend)
+
+    if args.serve:
+        serve(args)
+        return
+
+    problem = check_inputs(args)
+    if problem:
+        fail(*problem)
+
+    started = time.perf_counter()
+    inference, parts = load_classified(args)
+    model_load_ms = int((time.perf_counter() - started) * 1000)
+
+    result = run_job(args, inference, parts, model_load_ms)
+    emit(result)
+    if result["status"] != "ok":
+        sys.exit(1)
 
 
 if __name__ == "__main__":

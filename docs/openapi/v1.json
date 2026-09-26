@@ -280,6 +280,52 @@
         ],
         "type": "object"
       },
+      "ModelStateResponse": {
+        "description": "Ob das Modell zwischen den Aufträgen geladen ist.",
+        "properties": {
+          "busy": {
+            "description": "Ob gerade ein Lauf stattfindet.",
+            "type": "boolean"
+          },
+          "keepLoadedSeconds": {
+            "description": "Wie lange es nach dem letzten Lauf geladen bleibt; 0, wenn jeder Lauf es neu lädt.",
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "loaded": {
+            "description": "Ob es gerade im Speicher liegt.",
+            "type": "boolean"
+          },
+          "loadedSinceUtc": {
+            "description": "Seit wann es geladen ist.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unloadAtUtc": {
+            "description": "Wann es ohne weiteren Auftrag entladen wird.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "loaded",
+          "busy",
+          "keepLoadedSeconds",
+          "loadedSinceUtc",
+          "unloadAtUtc"
+        ],
+        "type": "object"
+      },
       "ProblemDetails": {
         "properties": {
           "detail": {
@@ -830,6 +876,69 @@
           {}
         ],
         "summary": "Ergebnis herunterladen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      }
+    },
+    "/api/v1/model": {
+      "delete": {
+        "description": "Entlädt das Modell sofort und gibt seinen Speicher frei, etwa bevor auf demselben Rechner ein anderes großes Modell lädt. Der nächste Auftrag lädt es wieder. Wiederholbar: Ist nichts geladen, lautet die Antwort ebenfalls 204. Läuft gerade ein Auftrag, lautet sie 409 mit dem Code 'MODEL_BUSY'; entladen wird dann nach der Leerlaufzeit von selbst oder mit einem erneuten Aufruf, sobald der Auftrag fertig ist.",
+        "operationId": "ReleaseModel",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Modell entladen",
+        "tags": [
+          "ChangeMyVoice"
+        ]
+      },
+      "get": {
+        "description": "Meldet, ob Seed-VC gerade im Speicher liegt. Nach einem Lauf bleibt das Modell eine einstellbare Zeit geladen (Inference:KeepModelLoadedFor, Standard 5 Minuten), damit der nächste Auftrag nicht erneut laden muss; 'unloadAtUtc' nennt, wann es ohne weiteren Auftrag entladen wird.",
+        "operationId": "GetModelState",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelStateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Der Zugangsschlüssel fehlt oder ist ungültig."
+          },
+          "403": {
+            "description": "Die Anfrage kam nicht von einer zugelassenen Adresse."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Geladenes Modell anzeigen",
         "tags": [
           "ChangeMyVoice"
         ]

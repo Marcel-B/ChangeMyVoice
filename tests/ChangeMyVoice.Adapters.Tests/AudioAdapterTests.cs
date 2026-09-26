@@ -201,6 +201,7 @@ public class MlxVcConversionEngineTests
             ScriptPath = "/pfad/zu/skript.py",
             WorkingDirectory = "/pfad/zu/mlx-vc",
         }),
+        TimeProvider.System,
         NullLogger<MlxVcConversionEngine>.Instance);
 
     private static ConversionRequest Request(ConversionOptions? options = null) => new(
@@ -293,6 +294,39 @@ public class MlxVcConversionEngineTests
 
         environment["SEED_VC_PATH"].ShouldBe("/seed-vc-ref");
         environment["HF_HUB_CACHE"].ShouldBe("/cache");
+    }
+
+    [Fact]
+    public void Der_Dauerbetrieb_bekommt_nur_die_Modellschalter()
+    {
+        var arguments = Sut().BuildServeArguments(new ModelKey(F0Condition: true, Fp16: false));
+
+        arguments[0].ShouldBe("/pfad/zu/skript.py");
+        arguments.ShouldContain("--serve");
+        arguments.ShouldContain("--f0-condition");
+        arguments.ShouldContain("--no-fp16");
+        arguments.ShouldNotContain("--source");
+        arguments.ShouldNotContain(argument => MlxVcConversionEngine.ForbiddenArgumentMarkers.Any(
+            marker => string.Equals(argument, marker, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void Die_Auftragszeile_traegt_Dateien_und_Stellschrauben()
+    {
+        ConversionOptions.TryCreate(30, 0.5, 1.1, null, null, null, -12, true, out var options, out _);
+
+        using var document = System.Text.Json.JsonDocument.Parse(
+            MlxVcConversionEngine.BuildServeRequest(Request(options)));
+        var root = document.RootElement;
+
+        root.GetProperty("source").GetString().ShouldBe("/tmp/source.wav");
+        root.GetProperty("reference").GetString().ShouldBe("/tmp/reference.wav");
+        root.GetProperty("output").GetString().ShouldBe("/tmp/output.wav");
+        root.GetProperty("diffusionSteps").GetInt32().ShouldBe(30);
+        root.GetProperty("inferenceCfgRate").GetDouble().ShouldBe(0.5);
+        root.GetProperty("lengthAdjust").GetDouble().ShouldBe(1.1);
+        root.GetProperty("semiToneShift").GetInt32().ShouldBe(-12);
+        root.GetProperty("autoF0Adjust").GetBoolean().ShouldBeTrue();
     }
 
     [Theory]

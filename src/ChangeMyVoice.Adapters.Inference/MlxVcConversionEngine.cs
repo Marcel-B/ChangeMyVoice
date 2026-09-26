@@ -15,12 +15,30 @@ namespace ChangeMyVoice.Adapters.Inference;
 /// <c>uv run</c>, kein <c>pip</c>. init.md §30 untersagt es ausdrücklich, die
 /// funktionierende Umgebung eigenmächtig zu verändern, und ein Test prüft die
 /// zusammengebaute Argumentliste genau darauf.
+/// <para>
+/// Mit <see cref="InferenceOptions.KeepModelLoadedFor" /> über null bleibt der
+/// Prozess samt Modell nach einem Lauf stehen (init.md §22) und wird erst nach
+/// dieser Leerlaufzeit, auf Anfrage (<see cref="ReleaseAsync" />) oder nach
+/// einem Fehler beendet. Die Läufe finden dann nacheinander statt, auch wenn
+/// mehrere gleichzeitig eingestellt sind: Es gibt nur ein geladenes Modell.
+/// </para>
 /// </remarks>
 public sealed class MlxVcConversionEngine(
     IOptions<InferenceOptions> options,
-    ILogger<MlxVcConversionEngine> logger) : IVoiceConversionEngine
+    TimeProvider clock,
+    ILogger<MlxVcConversionEngine> logger) : IVoiceConversionEngine, IInferenceModelHost, IAsyncDisposable
 {
     private readonly InferenceOptions _options = options.Value;
+
+    // Schützt den geladenen Prozess: Ein Lauf, das Entladen nach Leerlauf und
+    // das Entladen auf Anfrage schließen sich gegenseitig aus.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    private SeedVcServer? _server;
+    private DateTimeOffset? _loadedSince;
+    private DateTimeOffset? _unloadAt;
+    private ITimer? _idleTimer;
+    private bool _disposed;
 
     /// <summary>
     /// Zeichenfolgen, die in einem Aufruf nichts zu suchen haben, weil sie die
@@ -28,6 +46,45 @@ public sealed class MlxVcConversionEngine(
     /// </summary>
     internal static readonly string[] ForbiddenArgumentMarkers =
         ["pip", "uv", "--upgrade", "-U", "sync", "lock", "install"];
+
+    /// <summary>Ob das Modell zwischen den Läufen geladen bleibt.</summary>
+    internal bool KeepsModelLoaded => _options.KeepModelLoadedFor > TimeSpan.Zero;
+
+    /// <summary>Baut die Argumentliste für den Dauerbetrieb zusammen.</summary>
+    /// <remarks>
+    /// Nur die Schalter, die bestimmen, welcher Checkpoint geladen wird; alles
+    /// andere kommt je Auftrag über <see cref="BuildServeRequest" />.
+    /// </remarks>
+    internal IReadOnlyList<string> BuildServeArguments(ModelKey key)
+    {
+        var arguments = new List<string> { _options.ScriptPath, "--serve", "--backend", _options.Backend };
+
+        if (key.F0Condition)
+        {
+            arguments.Add("--f0-condition");
+        }
+
+        if (!key.Fp16)
+        {
+            arguments.Add("--no-fp16");
+        }
+
+        return arguments;
+    }
+
+    /// <summary>Baut die Auftragszeile für den Dauerbetrieb zusammen.</summary>
+    internal static string BuildServeRequest(ConversionRequest request) =>
+        JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["source"] = request.Source.Locator,
+            ["reference"] = request.Reference.Locator,
+            ["output"] = request.Output.Locator,
+            ["diffusionSteps"] = request.Options.DiffusionSteps,
+            ["inferenceCfgRate"] = request.Options.InferenceCfgRate,
+            ["lengthAdjust"] = request.Options.LengthAdjust,
+            ["semiToneShift"] = request.Options.SemiToneShift,
+            ["autoF0Adjust"] = request.Options.AutoF0Adjust,
+        });
 
     /// <summary>Baut die Argumentliste für einen Lauf zusammen.</summary>
     internal IReadOnlyList<string> BuildArguments(ConversionRequest request)
@@ -93,10 +150,19 @@ public sealed class MlxVcConversionEngine(
     }
 
     /// <inheritdoc />
-    public async Task<ConversionOutcome> ConvertAsync(
+    public Task<ConversionOutcome> ConvertAsync(
         ConversionRequest request,
         Action<int>? onProcessStarted = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        KeepsModelLoaded
+            ? ConvertOnServerAsync(request, onProcessStarted, cancellationToken)
+            : ConvertOnceAsync(request, onProcessStarted, cancellationToken);
+
+    /// <summary>Ein eigener Prozess nur für diesen Lauf, wie vor dem Dauerbetrieb.</summary>
+    private async Task<ConversionOutcome> ConvertOnceAsync(
+        ConversionRequest request,
+        Action<int>? onProcessStarted,
+        CancellationToken cancellationToken)
     {
         var arguments = BuildArguments(request);
 
@@ -134,31 +200,369 @@ public sealed class MlxVcConversionEngine(
                 ConversionErrorCode.Timeout, "Die Konvertierung hat zu lange gedauert.");
         }
 
-        // Die Fehlerausgabe gehört vollständig ins Log, aber niemals in die
-        // Antwort an den Aufrufer.
-        if (!string.IsNullOrWhiteSpace(result.StandardError))
-        {
-            logger.LogInformation("Ausgabe des Inferenzlaufs: {Error}", result.StandardError.Trim());
-        }
+        LogStandardError(result.StandardError);
 
-        return Interpret(result);
-    }
-
-    private ConversionOutcome Interpret(ProcessResult result)
-    {
         var line = result.StandardOutput
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .LastOrDefault(l => l.StartsWith('{'));
 
         if (line is null)
         {
-            // Das Skript kam nicht bis zur Ausgabe — etwa weil der Interpreter
-            // selbst gescheitert ist. Dann bleibt nur die grobe Zuordnung.
             logger.LogWarning(
                 "Der Lauf endete mit Code {ExitCode} ohne verwertbare Ausgabe.", result.ExitCode);
+        }
+
+        return Interpret(line, result.StandardError);
+    }
+
+    /// <summary>Ein Lauf im stehenden Prozess, der bei Bedarf erst gestartet wird.</summary>
+    private async Task<ConversionOutcome> ConvertOnServerAsync(
+        ConversionRequest request,
+        Action<int>? onProcessStarted,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            CancelIdleUnload();
+
+            var key = new ModelKey(request.Options.F0Condition, request.Options.Fp16);
+
+            if (_server is { } running && (running.HasExited || running.Key != key))
+            {
+                logger.LogInformation(
+                    running.HasExited
+                        ? "Der Inferenzprozess lief nicht mehr und wird neu gestartet."
+                        : "Der Auftrag braucht ein anderes Modell; der Inferenzprozess wird neu gestartet.");
+                await StopServerAsync().ConfigureAwait(false);
+            }
+
+            using var timeout = new CancellationTokenSource(_options.Timeout);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, timeout.Token);
+
+            var outcome = await RunOnServerAsync(request, key, onProcessStarted, linked.Token)
+                .ConfigureAwait(false);
+
+            if (outcome is null)
+            {
+                // Zeitablauf oder Abbruch: Der Prozess wurde dabei beendet.
+                await StopServerAsync().ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                logger.LogWarning("Der Lauf überschritt das Zeitlimit von {Timeout}.", _options.Timeout);
+
+                return ConversionOutcome.Failure(
+                    ConversionErrorCode.Timeout, "Die Konvertierung hat zu lange gedauert.");
+            }
+
+            if (!outcome.IsSuccess)
+            {
+                // Nach einem Fehler, gerade nach zu wenig Speicher oder einem
+                // Fehler der Grafikbeschleunigung, ist dem geladenen Zustand
+                // nicht mehr zu trauen. Der nächste Lauf lädt frisch.
+                await StopServerAsync().ConfigureAwait(false);
+            }
+
+            return outcome;
+        }
+        finally
+        {
+            ScheduleIdleUnload();
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Führt den Lauf aus; <c>null</c> bei Zeitablauf oder Abbruch.
+    /// </summary>
+    private async Task<ConversionOutcome?> RunOnServerAsync(
+        ConversionRequest request,
+        ModelKey key,
+        Action<int>? onProcessStarted,
+        CancellationToken cancellationToken)
+    {
+        TimeSpan? modelLoad = TimeSpan.Zero;
+
+        if (_server is null)
+        {
+            try
+            {
+                _server = SeedVcServer.Start(
+                    _options.PythonExecutable,
+                    BuildServeArguments(key),
+                    _options.WorkingDirectory,
+                    BuildEnvironment(),
+                    key);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Der Inferenzprozess ließ sich nicht starten.");
+                _server = null;
+
+                return ConversionOutcome.Failure(
+                    ConversionErrorCode.ModelLoadFailed,
+                    "Die Konvertierungsumgebung ließ sich nicht starten.");
+            }
+
+            _loadedSince = clock.GetUtcNow();
+        }
+
+        var server = _server;
+
+        // Auch bei einem schon laufenden Prozess: Jeder Auftrag vermerkt die
+        // Kennung, damit die Wiederherstellung nach einem Absturz den Prozess
+        // findet, der zuletzt für ihn rechnete.
+        onProcessStarted?.Invoke(server.ProcessId);
+
+        // Ein Lesen aus der Leitung lässt sich nicht überall zuverlässig
+        // abbrechen; das Beenden des Prozesses schließt sie in jedem Fall.
+        using var registration = cancellationToken.Register(server.Kill);
+
+        try
+        {
+            if (!server.IsReady)
+            {
+                var ready = await server.ReadResponseAsync(cancellationToken).ConfigureAwait(false);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return null;
+                }
+
+                if (!TryReadReady(ready, out var loadTime))
+                {
+                    var loadError = server.TakeStandardError();
+                    LogStandardError(loadError);
+                    logger.LogWarning("Das Modell ließ sich nicht laden.");
+                    return Interpret(ready, loadError);
+                }
+
+                server.MarkReady();
+                modelLoad = loadTime;
+                logger.LogInformation(
+                    "Modell geladen in {ModelLoad}; es bleibt {KeepFor} nach dem letzten Lauf im Speicher.",
+                    loadTime, _options.KeepModelLoadedFor);
+            }
+            else
+            {
+                logger.LogInformation("Das Modell ist bereits geladen.");
+            }
+
+            await server.SendAsync(BuildServeRequest(request), cancellationToken).ConfigureAwait(false);
+            var line = await server.ReadResponseAsync(cancellationToken).ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            var standardError = server.TakeStandardError();
+            LogStandardError(standardError);
+
+            if (line is null)
+            {
+                logger.LogWarning("Der Inferenzprozess endete mitten im Lauf.");
+            }
+
+            var outcome = Interpret(line, standardError);
+
+            return outcome.IsSuccess
+                ? outcome with { ModelLoadDuration = modelLoad }
+                : outcome;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (IOException ex)
+        {
+            // Die Leitung brach weg, weil der Prozess starb.
+            logger.LogWarning(ex, "Die Verbindung zum Inferenzprozess brach ab.");
+            var standardError = server.TakeStandardError();
+            LogStandardError(standardError);
 
             return ConversionOutcome.Failure(
-                ClassifyFromStandardError(result.StandardError),
+                ClassifyFromStandardError(standardError), "Die Konvertierung ist fehlgeschlagen.");
+        }
+    }
+
+    /// <inheritdoc />
+    public InferenceModelState GetState()
+    {
+        var server = _server;
+        var loaded = server is { IsReady: true, HasExited: false };
+
+        return new InferenceModelState(
+            loaded,
+            IsBusy: _gate.CurrentCount == 0,
+            KeepLoadedFor: KeepsModelLoaded ? _options.KeepModelLoadedFor : TimeSpan.Zero,
+            LoadedSinceUtc: loaded ? _loadedSince : null,
+            UnloadAtUtc: loaded ? _unloadAt : null);
+    }
+
+    /// <inheritdoc />
+    public async Task<ModelReleaseResult> ReleaseAsync(CancellationToken cancellationToken = default)
+    {
+        // Nicht warten: Wer den Speicher braucht, soll sofort erfahren, dass
+        // noch gerechnet wird, statt womöglich eine Stunde zu hängen.
+        if (!await _gate.WaitAsync(TimeSpan.Zero, cancellationToken).ConfigureAwait(false))
+        {
+            return ModelReleaseResult.Busy;
+        }
+
+        try
+        {
+            CancelIdleUnload();
+
+            if (_server is null)
+            {
+                return ModelReleaseResult.NotLoaded;
+            }
+
+            logger.LogInformation("Das Modell wird auf Anfrage entladen.");
+            await StopServerAsync().ConfigureAwait(false);
+            return ModelReleaseResult.Released;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            _disposed = true;
+            CancelIdleUnload();
+            await StopServerAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Beendet den stehenden Prozess. Nur unter <see cref="_gate" /> aufrufen.</summary>
+    private async Task StopServerAsync()
+    {
+        var server = _server;
+        _server = null;
+        _loadedSince = null;
+        _unloadAt = null;
+
+        if (server is not null)
+        {
+            await server.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private void CancelIdleUnload()
+    {
+        _idleTimer?.Dispose();
+        _idleTimer = null;
+        _unloadAt = null;
+    }
+
+    /// <summary>Plant das Entladen nach der Leerlaufzeit. Nur unter <see cref="_gate" /> aufrufen.</summary>
+    private void ScheduleIdleUnload()
+    {
+        CancelIdleUnload();
+
+        if (_server is null || _disposed)
+        {
+            return;
+        }
+
+        _unloadAt = clock.GetUtcNow() + _options.KeepModelLoadedFor;
+        _idleTimer = clock.CreateTimer(
+            _ => _ = UnloadIdleAsync(), null, _options.KeepModelLoadedFor, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task UnloadIdleAsync()
+    {
+        // Läuft gerade ein Auftrag, plant der danach selbst neu.
+        if (!await _gate.WaitAsync(TimeSpan.Zero).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        try
+        {
+            // Ein Auftrag kann zwischen Auslösen und Sperre neu geplant haben.
+            if (_server is null || _unloadAt is not { } due || clock.GetUtcNow() < due)
+            {
+                return;
+            }
+
+            logger.LogInformation(
+                "Das Modell wird nach {KeepFor} ohne Auftrag entladen.", _options.KeepModelLoadedFor);
+            CancelIdleUnload();
+            await StopServerAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Das Entladen nach Leerlauf ist fehlgeschlagen.");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Liest die Meldung, dass das Modell geladen ist.</summary>
+    private static bool TryReadReady(string? line, out TimeSpan? modelLoad)
+    {
+        modelLoad = null;
+
+        if (line is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            var root = document.RootElement;
+
+            if (root.TryGetProperty("status", out var status) && status.GetString() == "ready")
+            {
+                modelLoad = ReadDuration(root, "modelLoadMs");
+                return true;
+            }
+        }
+        catch (JsonException)
+        {
+            // Dann ist es keine Bereitmeldung; Interpret sagt, was es ist.
+        }
+
+        return false;
+    }
+
+    private void LogStandardError(string standardError)
+    {
+        // Die Fehlerausgabe gehört vollständig ins Log, aber niemals in die
+        // Antwort an den Aufrufer.
+        if (!string.IsNullOrWhiteSpace(standardError))
+        {
+            logger.LogInformation("Ausgabe des Inferenzlaufs: {Error}", standardError.Trim());
+        }
+    }
+
+    /// <summary>Wertet die Antwortzeile eines Laufs aus.</summary>
+    private ConversionOutcome Interpret(string? line, string standardError)
+    {
+        if (line is null)
+        {
+            // Das Skript kam nicht bis zur Ausgabe — etwa weil der Interpreter
+            // selbst gescheitert ist. Dann bleibt nur die grobe Zuordnung.
+            return ConversionOutcome.Failure(
+                ClassifyFromStandardError(standardError),
                 "Die Konvertierung ist fehlgeschlagen.");
         }
 
@@ -176,14 +580,11 @@ public sealed class MlxVcConversionEngine(
                     ReadDuration(root, "inferenceMs"));
             }
 
-            var code = root.TryGetProperty("code", out var c) ? c.GetString() : null;
-            var message = root.TryGetProperty("message", out var m) ? m.GetString() : null;
+            var code = ParseErrorCode(root.TryGetProperty("code", out var c) ? c.GetString() : null);
 
-            return ConversionOutcome.Failure(
-                ParseErrorCode(code),
-                // Die Meldung aus Python kann Pfade enthalten; nach außen geht
-                // deshalb ein knapper, unverfänglicher Text.
-                DescribeFor(ParseErrorCode(code)));
+            // Die Meldung aus Python kann Pfade enthalten; nach außen geht
+            // deshalb ein knapper, unverfänglicher Text.
+            return ConversionOutcome.Failure(code, DescribeFor(code));
         }
         catch (JsonException ex)
         {

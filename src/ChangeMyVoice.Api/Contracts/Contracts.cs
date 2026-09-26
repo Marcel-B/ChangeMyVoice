@@ -139,3 +139,24 @@ public sealed record HealthResponse(string Status, IReadOnlyList<HealthCheckResp
 /// <param name="Healthy">Ob sie bestanden wurde.</param>
 /// <param name="Detail">Eine knappe Erläuterung, falls nicht.</param>
 public sealed record HealthCheckResponse(string Name, bool Healthy, string? Detail);
+
+/// <summary>Ob das Modell zwischen den Aufträgen geladen ist.</summary>
+/// <param name="Loaded">Ob es gerade im Speicher liegt.</param>
+/// <param name="Busy">Ob gerade ein Lauf stattfindet.</param>
+/// <param name="KeepLoadedSeconds">
+/// Wie lange es nach dem letzten Lauf geladen bleibt; 0, wenn jeder Lauf es neu lädt.
+/// </param>
+/// <param name="LoadedSinceUtc">Seit wann es geladen ist.</param>
+/// <param name="UnloadAtUtc">Wann es ohne weiteren Auftrag entladen wird.</param>
+public sealed record ModelStateResponse(
+    bool Loaded,
+    bool Busy,
+    double KeepLoadedSeconds,
+    DateTimeOffset? LoadedSinceUtc,
+    DateTimeOffset? UnloadAtUtc)
+{
+    /// <summary>Bildet die Antwort aus dem Zustand des Modells.</summary>
+    public static ModelStateResponse From(Application.Ports.InferenceModelState state) =>
+        new(state.IsLoaded, state.IsBusy, state.KeepLoadedFor.TotalSeconds,
+            state.LoadedSinceUtc, state.UnloadAtUtc);
+}

@@ -46,6 +46,29 @@ public sealed class FakeConversionEngine : IVoiceConversionEngine
     }
 }
 
+/// <summary>Ein Modell, dessen Zustand die Tests vorgeben.</summary>
+public sealed class FakeModelHost : IInferenceModelHost
+{
+    /// <summary>Was der Zustand melden soll.</summary>
+    public InferenceModelState State { get; set; } = new(false, false, TimeSpan.FromMinutes(5));
+
+    /// <summary>Was das Entladen melden soll.</summary>
+    public ModelReleaseResult ReleaseResult { get; set; } = ModelReleaseResult.NotLoaded;
+
+    /// <summary>Wie oft entladen wurde.</summary>
+    public int Releases { get; private set; }
+
+    /// <inheritdoc />
+    public InferenceModelState GetState() => State;
+
+    /// <inheritdoc />
+    public Task<ModelReleaseResult> ReleaseAsync(CancellationToken cancellationToken = default)
+    {
+        Releases++;
+        return Task.FromResult(ReleaseResult);
+    }
+}
+
 /// <summary>Meldet die Umgebung immer als bereit.</summary>
 public sealed class FakeEnvironmentProbe : IInferenceEnvironmentProbe
 {
@@ -107,6 +130,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Die eingesetzte Konvertierungsmaschine.</summary>
     public FakeConversionEngine Engine { get; } = new();
 
+    /// <summary>Das eingesetzte Modell.</summary>
+    public FakeModelHost ModelHost { get; } = new();
+
     /// <summary>Der Rechner, den die Tests als Webhook-Ziel freigeben.</summary>
     public const string WebhookHost = "receiver.test";
 
@@ -138,6 +164,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.RemoveAll<IVoiceConversionEngine>();
             services.AddSingleton<IVoiceConversionEngine>(Engine);
+
+            services.RemoveAll<IInferenceModelHost>();
+            services.AddSingleton<IInferenceModelHost>(ModelHost);
 
             services.RemoveAll<IInferenceEnvironmentProbe>();
             services.AddSingleton<IInferenceEnvironmentProbe, FakeEnvironmentProbe>();

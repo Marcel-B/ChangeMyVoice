@@ -10,6 +10,7 @@ using ChangeMyVoice.Api.Security;
 using ChangeMyVoice.Application.Ports;
 using ChangeMyVoice.Application.UseCases.Jobs;
 using ChangeMyVoice.Application.UseCases.Maintenance;
+using ChangeMyVoice.Application.UseCases.Model;
 using ChangeMyVoice.Application.UseCases.Voices;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.Features;
@@ -83,7 +84,11 @@ builder.Services.AddSingleton<IJobWorkspaceStore>(
 
 builder.Services.AddSingleton<IAudioProbe, FfprobeAudioProbe>();
 builder.Services.AddSingleton<IAudioNormalizer, FfmpegAudioNormalizer>();
-builder.Services.AddSingleton<IVoiceConversionEngine, MlxVcConversionEngine>();
+// Eine Instanz für beide Rollen: Sie hält den geladenen Prozess, und das
+// Entladen auf Anfrage muss genau diesen treffen.
+builder.Services.AddSingleton<MlxVcConversionEngine>();
+builder.Services.AddSingleton<IVoiceConversionEngine>(sp => sp.GetRequiredService<MlxVcConversionEngine>());
+builder.Services.AddSingleton<IInferenceModelHost>(sp => sp.GetRequiredService<MlxVcConversionEngine>());
 builder.Services.AddSingleton<IInferenceEnvironmentProbe, PythonEnvironmentProbe>();
 builder.Services.AddSingleton<IOrphanProcessKiller, ProcessTreeKiller>();
 
@@ -130,6 +135,8 @@ builder.Services.AddScoped<ICancelJob, CancelJob>();
 builder.Services.AddScoped<IProcessConversionJob, ProcessConversionJob>();
 builder.Services.AddScoped<ICleanupJobArtifacts, CleanupJobArtifacts>();
 builder.Services.AddScoped<IRecoverInterruptedJobs, RecoverInterruptedJobs>();
+builder.Services.AddScoped<IGetModelState, GetModelState>();
+builder.Services.AddScoped<IReleaseModel, ReleaseModel>();
 
 // ---------------------------------------------------------------------------
 // Hintergrunddienste. Die Reihenfolge ist die Startreihenfolge und damit
@@ -202,6 +209,7 @@ var api = app.MapGroup("/api/v1")
 
 api.MapVoiceEndpoints();
 api.MapJobEndpoints();
+api.MapModelEndpoints();
 
 app.MapGet("/health/live", () => TypedResults.Ok(new HealthResponse("healthy", [])))
     .AllowAnonymous()
