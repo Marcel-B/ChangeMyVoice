@@ -22,13 +22,15 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 diffusion_steps, inference_cfg_rate, length_adjust, f0_condition, fp16,
                 created_at_utc, started_at_utc, finished_at_utc, downloaded_at_utc,
                 error_code, error_message, output_size_bytes, output_sha256,
-                instance_id, inference_process_id, artifacts_purged, source_length_ms, output_sample_rate, webhook_url)
+                instance_id, inference_process_id, artifacts_purged, source_length_ms, output_sample_rate, webhook_url,
+                semi_tone_shift, auto_f0_adjust)
             VALUES (
                 @Id, @VoiceId, @VoiceLabel, @Status,
                 @DiffusionSteps, @InferenceCfgRate, @LengthAdjust, @F0Condition, @Fp16,
                 @CreatedAt, @StartedAt, @FinishedAt, @DownloadedAt,
                 @ErrorCode, @ErrorMessage, @OutputSize, @OutputSha,
-                @InstanceId, @ProcessId, @Purged, @SourceLength, @OutputSampleRate, @WebhookUrl)
+                @InstanceId, @ProcessId, @Purged, @SourceLength, @OutputSampleRate, @WebhookUrl,
+                @SemiToneShift, @AutoF0Adjust)
             ON CONFLICT(id) DO UPDATE SET
                 status = excluded.status,
                 started_at_utc = excluded.started_at_utc,
@@ -67,6 +69,8 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 SourceLength = (long)job.SourceLength.TotalMilliseconds,
                 OutputSampleRate = job.Options.OutputSampleRate,
                 WebhookUrl = job.WebhookUrl?.ToString(),
+                job.Options.SemiToneShift,
+                AutoF0Adjust = job.Options.AutoF0Adjust ? 1 : 0,
             }).ConfigureAwait(false);
     }
 
@@ -176,12 +180,15 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
         public long Source_Length_Ms { get; init; }
         public long Output_Sample_Rate { get; init; }
         public string? Webhook_Url { get; init; }
+        public long Semi_Tone_Shift { get; init; }
+        public long Auto_F0_Adjust { get; init; }
 
         public ConversionJob ToDomain()
         {
             ConversionOptions.TryCreate(
                 Diffusion_Steps, Inference_Cfg_Rate, Length_Adjust,
                 F0_Condition != 0, Fp16 != 0, Output_Sample_Rate == 0 ? null : (int)Output_Sample_Rate,
+                (int)Semi_Tone_Shift, Auto_F0_Adjust != 0,
                 out var options, out _);
 
             JobError? error = null;

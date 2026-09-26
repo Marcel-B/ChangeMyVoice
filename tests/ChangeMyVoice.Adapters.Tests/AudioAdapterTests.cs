@@ -248,9 +248,31 @@ public class MlxVcConversionEngineTests
     [Fact]
     public void Im_Sprachpfad_wird_der_Schalter_weggelassen()
     {
-        ConversionOptions.TryCreate(null, null, null, false, null, null, out var options, out _);
+        ConversionOptions.TryCreate(null, null, null, false, null, null, null, null, out var options, out _);
 
         Sut().BuildArguments(Request(options)).ShouldNotContain("--f0-condition");
+    }
+
+    [Fact]
+    public void Ohne_Verschiebung_bleiben_die_Tonhoehenschalter_weg()
+    {
+        var arguments = Sut().BuildArguments(Request());
+
+        arguments.ShouldNotContain("--semi-tone-shift");
+        arguments.ShouldNotContain("--auto-f0-adjust");
+    }
+
+    [Fact]
+    public void Halbtoene_und_Tonlagenabgleich_werden_uebergeben()
+    {
+        ConversionOptions.TryCreate(null, null, null, null, null, null, -12, true, out var options, out _);
+
+        var arguments = Sut().BuildArguments(Request(options));
+
+        var index = arguments.ToList().IndexOf("--semi-tone-shift");
+        index.ShouldBeGreaterThan(0);
+        arguments[index + 1].ShouldBe("-12");
+        arguments.ShouldContain("--auto-f0-adjust");
     }
 
     [Fact]
