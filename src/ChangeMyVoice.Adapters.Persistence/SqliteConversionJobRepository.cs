@@ -22,13 +22,13 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 diffusion_steps, inference_cfg_rate, length_adjust, f0_condition, fp16,
                 created_at_utc, started_at_utc, finished_at_utc, downloaded_at_utc,
                 error_code, error_message, output_size_bytes, output_sha256,
-                instance_id, inference_process_id, artifacts_purged, source_length_ms, output_sample_rate)
+                instance_id, inference_process_id, artifacts_purged, source_length_ms, output_sample_rate, webhook_url)
             VALUES (
                 @Id, @VoiceId, @VoiceLabel, @Status,
                 @DiffusionSteps, @InferenceCfgRate, @LengthAdjust, @F0Condition, @Fp16,
                 @CreatedAt, @StartedAt, @FinishedAt, @DownloadedAt,
                 @ErrorCode, @ErrorMessage, @OutputSize, @OutputSha,
-                @InstanceId, @ProcessId, @Purged, @SourceLength, @OutputSampleRate)
+                @InstanceId, @ProcessId, @Purged, @SourceLength, @OutputSampleRate, @WebhookUrl)
             ON CONFLICT(id) DO UPDATE SET
                 status = excluded.status,
                 started_at_utc = excluded.started_at_utc,
@@ -66,6 +66,7 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 Purged = job.ArtifactsPurged ? 1 : 0,
                 SourceLength = (long)job.SourceLength.TotalMilliseconds,
                 OutputSampleRate = job.Options.OutputSampleRate,
+                WebhookUrl = job.WebhookUrl?.ToString(),
             }).ConfigureAwait(false);
     }
 
@@ -174,6 +175,7 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
         public long Artifacts_Purged { get; init; }
         public long Source_Length_Ms { get; init; }
         public long Output_Sample_Rate { get; init; }
+        public string? Webhook_Url { get; init; }
 
         public ConversionJob ToDomain()
         {
@@ -205,7 +207,8 @@ public sealed class SqliteConversionJobRepository(SqliteConnectionFactory factor
                 Guid.Parse(Instance_Id),
                 (int?)Inference_Process_Id,
                 Artifacts_Purged != 0,
-                TimeSpan.FromMilliseconds(Source_Length_Ms));
+                TimeSpan.FromMilliseconds(Source_Length_Ms),
+                Webhook_Url is null ? null : WebhookUrl.Rehydrate(Webhook_Url));
         }
 
         private static DateTimeOffset? Parse(string? value) =>

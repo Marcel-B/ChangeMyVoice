@@ -89,6 +89,12 @@ public sealed class ConversionJob
     public TimeSpan SourceLength { get; private init; }
 
     /// <summary>
+    /// Die Adresse, die beim Ende des Auftrags aufgerufen wird, oder <c>null</c>,
+    /// wenn der Aufrufer selbst nachfragt.
+    /// </summary>
+    public WebhookUrl? WebhookUrl { get; private init; }
+
+    /// <summary>
     /// Wie lange die Konvertierung voraussichtlich dauert. Eine Orientierung für
     /// aufrufende Oberflächen, keine Zusage — bei Laufzeiten von einer Stunde ist
     /// die Angabe wichtiger als bei wenigen Sekunden.
@@ -153,10 +159,12 @@ public sealed class ConversionJob
         ConversionOptions options,
         DateTimeOffset createdAtUtc,
         Guid instanceId,
-        TimeSpan sourceLength = default) =>
+        TimeSpan sourceLength = default,
+        WebhookUrl? webhookUrl = null) =>
         new(id, voiceId, voiceLabel, options, createdAtUtc, instanceId)
         {
             SourceLength = sourceLength,
+            WebhookUrl = webhookUrl,
         };
 
     /// <summary>Stellt einen gespeicherten Auftrag wieder her.</summary>
@@ -176,12 +184,14 @@ public sealed class ConversionJob
         Guid instanceId,
         int? inferenceProcessId,
         bool artifactsPurged,
-        TimeSpan sourceLength = default) =>
+        TimeSpan sourceLength = default,
+        WebhookUrl? webhookUrl = null) =>
         new(id, voiceId, voiceLabel, options, status, createdAtUtc, startedAtUtc, finishedAtUtc,
             downloadedAtUtc, error, outputSizeBytes, outputSha256, instanceId, inferenceProcessId,
             artifactsPurged)
         {
             SourceLength = sourceLength,
+            WebhookUrl = webhookUrl,
         };
 
     /// <summary>Beginnt die Berechnung.</summary>

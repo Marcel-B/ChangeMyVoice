@@ -55,6 +55,43 @@ public sealed class FakeEnvironmentProbe : IInferenceEnvironmentProbe
         Task.FromResult<IReadOnlyList<ReadinessCheck>>([new ReadinessCheck("fake", true)]);
 }
 
+/// <summary>Nimmt die Webhook-Aufrufe entgegen, statt sie ins Netz zu schicken.</summary>
+public sealed class WebhookReceiver : HttpMessageHandler
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(Uri Target, string Body)> _received = new();
+
+    /// <summary>Die bisher eingegangenen Aufrufe.</summary>
+    public IReadOnlyList<(Uri Target, string Body)> Received => _received.ToArray();
+
+    /// <summary>Wartet, bis ein Aufruf an die Adresse eingegangen ist.</summary>
+    public async Task<string> WaitForAsync(Uri target, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var hit = Received.FirstOrDefault(r => r.Target == target);
+            if (hit.Body is not null)
+            {
+                return hit.Body;
+            }
+
+            await Task.Delay(50).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Kein Aufruf an {target}.");
+    }
+
+    /// <inheritdoc />
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var body = await request.Content!.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        _received.Enqueue((request.RequestUri!, body));
+        return new HttpResponseMessage(System.Net.HttpStatusCode.NoContent);
+    }
+}
+
 /// <summary>Startet die Anwendung mit einem eigenen Datenverzeichnis.</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -69,6 +106,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     /// <summary>Die eingesetzte Konvertierungsmaschine.</summary>
     public FakeConversionEngine Engine { get; } = new();
+
+    /// <summary>Der Rechner, den die Tests als Webhook-Ziel freigeben.</summary>
+    public const string WebhookHost = "receiver.test";
+
+    /// <summary>Wo die Webhook-Aufrufe ankommen.</summary>
+    public WebhookReceiver Webhooks { get; } = new();
 
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -88,6 +131,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Security:Clients:0:Name", "test");
         builder.UseSetting("Security:Clients:0:KeySha256", ComputeHash(ApiKey));
 
+        builder.UseSetting("Webhooks:AllowedHosts:0", WebhookHost);
+        builder.UseSetting("Webhooks:RetryDelay", "00:00:00");
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IVoiceConversionEngine>();
@@ -95,6 +141,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             services.RemoveAll<IInferenceEnvironmentProbe>();
             services.AddSingleton<IInferenceEnvironmentProbe, FakeEnvironmentProbe>();
+
+            services.AddHttpClient(Adapters.Notifications.WebhookDispatcher.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => Webhooks);
         });
     }
 

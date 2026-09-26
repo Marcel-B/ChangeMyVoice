@@ -70,6 +70,10 @@ public sealed record JobErrorResponse(string Code, string Message);
 /// gedacht für eine Fortschrittsanzeige, denn ein Lauf kann je nach Länge des
 /// Materials deutlich über eine Stunde dauern.
 /// </param>
+/// <param name="WebhookUrl">
+/// Die Adresse, die beim Ende des Auftrags aufgerufen wird, falls beim Anlegen
+/// eine angegeben wurde.
+/// </param>
 public sealed record JobResponse(
     string JobId,
     string Status,
@@ -83,7 +87,8 @@ public sealed record JobResponse(
     long? ResultSizeBytes,
     string? ResultSha256,
     double SourceLengthSeconds,
-    double EstimatedDurationSeconds)
+    double EstimatedDurationSeconds,
+    string? WebhookUrl = null)
 {
     /// <summary>Bildet die Antwort aus der Sicht der Anwendungsschicht.</summary>
     public static JobResponse From(ConversionJobView view) =>
@@ -101,7 +106,8 @@ public sealed record JobResponse(
             view.OutputSizeBytes,
             view.OutputSha256,
             Math.Round(view.SourceLength.TotalSeconds, 1),
-            Math.Round(view.EstimatedDuration.TotalSeconds));
+            Math.Round(view.EstimatedDuration.TotalSeconds),
+            view.WebhookUrl?.ToString());
 
     /// <summary>
     /// Wandelt einen Aufzählungsnamen in die Schreibweise um, die init.md §24

@@ -5,6 +5,7 @@
     <ProjectReference Include="..\ChangeMyVoice.Adapters.Persistence\ChangeMyVoice.Adapters.Persistence.csproj" />
     <ProjectReference Include="..\ChangeMyVoice.Adapters.Storage\ChangeMyVoice.Adapters.Storage.csproj" />
     <ProjectReference Include="..\ChangeMyVoice.Adapters.Inference\ChangeMyVoice.Adapters.Inference.csproj" />
+    <ProjectReference Include="..\ChangeMyVoice.Adapters.Notifications\ChangeMyVoice.Adapters.Notifications.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

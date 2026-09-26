@@ -243,3 +243,14 @@ public sealed class FakeOrphanProcessKiller : IOrphanProcessKiller
         return Succeeds;
     }
 }
+
+/// <summary>Hält fest, welche Benachrichtigungen eingereiht wurden.</summary>
+public sealed class FakeJobNotifier : IJobNotifier
+{
+    private readonly ConcurrentQueue<JobFinishedNotification> _sent = new();
+
+    /// <summary>Die eingereihten Benachrichtigungen in ihrer Reihenfolge.</summary>
+    public IReadOnlyList<JobFinishedNotification> Sent => _sent.ToArray();
+
+    public void Enqueue(JobFinishedNotification notification) => _sent.Enqueue(notification);
+}

@@ -139,6 +139,32 @@ public class SqliteConversionJobRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Die_Webhook_Adresse_bleibt_erhalten()
+    {
+        WebhookUrl.TryCreate("https://yue.example/api/voice/done?song=3", [], out var webhook, out _)
+            .ShouldBeTrue();
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, Now, Instance,
+            webhookUrl: webhook);
+
+        await _sut.SaveAsync(job);
+        job.Start(Now, Instance);
+        await _sut.SaveAsync(job);
+
+        (await _sut.FindAsync(job.Id))!.WebhookUrl.ShouldBe(webhook);
+    }
+
+    [Fact]
+    public async Task Ohne_Webhook_Adresse_bleibt_sie_leer()
+    {
+        var job = Job();
+
+        await _sut.SaveAsync(job);
+
+        (await _sut.FindAsync(job.Id))!.WebhookUrl.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Der_gesamte_Lebenslauf_bleibt_erhalten()
     {
         var job = Job();
@@ -346,4 +372,62 @@ public class SqliteJobListingTests : IDisposable
     }
 
     public void Dispose() => _fixture.Dispose();
+}
+
+public class SqliteSchemaTests
+{
+    [Fact]
+    public async Task Eine_Datenbank_ohne_Webhook_Spalte_bekommt_sie_nachgetragen()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "cmv-db", Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "alt.db");
+
+        try
+        {
+            // Der Stand vor der Webhook-Spalte, wie ihn laufende Dienste haben.
+            using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText =
+                    """
+                    CREATE TABLE conversion_jobs (
+                        id TEXT PRIMARY KEY, voice_id TEXT NOT NULL, voice_label TEXT NOT NULL,
+                        status TEXT NOT NULL, diffusion_steps INTEGER NOT NULL,
+                        inference_cfg_rate REAL NOT NULL, length_adjust REAL NOT NULL,
+                        f0_condition INTEGER NOT NULL, fp16 INTEGER NOT NULL,
+                        created_at_utc TEXT NOT NULL, started_at_utc TEXT NULL,
+                        finished_at_utc TEXT NULL, downloaded_at_utc TEXT NULL,
+                        error_code TEXT NULL, error_message TEXT NULL,
+                        output_size_bytes INTEGER NULL, output_sha256 TEXT NULL,
+                        instance_id TEXT NOT NULL, inference_process_id INTEGER NULL,
+                        artifacts_purged INTEGER NOT NULL DEFAULT 0,
+                        source_length_ms INTEGER NOT NULL DEFAULT 0,
+                        output_sample_rate INTEGER NOT NULL DEFAULT 48000);
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var factory = new SqliteConnectionFactory(Options.Create(new PersistenceOptions
+            {
+                DatabasePath = path,
+            }));
+            var repository = new SqliteConversionJobRepository(factory);
+            var job = ConversionJob.Create(
+                JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default,
+                DateTimeOffset.UnixEpoch, Guid.NewGuid(),
+                webhookUrl: WebhookUrl.Rehydrate("http://127.0.0.1:5091/hook"));
+
+            await repository.SaveAsync(job);
+
+            (await repository.FindAsync(job.Id))!.WebhookUrl!.ToString()
+                .ShouldBe("http://127.0.0.1:5091/hook");
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

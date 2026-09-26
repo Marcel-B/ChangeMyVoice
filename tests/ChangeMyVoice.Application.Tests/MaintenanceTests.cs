@@ -17,9 +17,10 @@ public class CleanupJobArtifactsTests
     private readonly FakeJobWorkspaceStore _workspaces = new();
     private readonly FakeTimeProvider _clock = new(Start);
     private readonly CleanupSettings _settings = new();
+    private readonly FakeJobNotifier _notifier = new();
 
     private CleanupJobArtifacts Sut() => new(
-        _jobs, _workspaces, _settings, _clock, NullLogger<CleanupJobArtifacts>.Instance);
+        _jobs, _workspaces, _settings, _notifier, _clock, NullLogger<CleanupJobArtifacts>.Instance);
 
     private async Task<ConversionJob> GivenCompletedJob(DateTimeOffset finishedAt)
     {
@@ -74,6 +75,38 @@ public class CleanupJobArtifactsTests
         var stored = await _jobs.FindAsync(job.Id);
         stored!.Status.ShouldBe(JobStatus.Failed);
         stored.Error!.Code.ShouldBe(ConversionErrorCode.Timeout);
+    }
+
+    [Fact]
+    public async Task Ein_haengender_Auftrag_meldet_die_Zeitueberschreitung()
+    {
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, Start, Guid.NewGuid(),
+            webhookUrl: WebhookUrl.Rehydrate("https://yue.example/hook"));
+        job.Start(Start, Guid.NewGuid());
+        await _jobs.SaveAsync(job);
+        _clock.SetUtcNow(Start.AddHours(2));
+
+        await Sut().ExecuteAsync();
+
+        _notifier.Sent.ShouldHaveSingleItem().Job.Error!.Code.ShouldBe(ConversionErrorCode.Timeout);
+    }
+
+    [Fact]
+    public async Task Das_Aufraeumen_eines_fertigen_Auftrags_meldet_nichts()
+    {
+        // Das Ende wurde schon gemeldet, als der Auftrag fertig wurde.
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, Start, Guid.NewGuid(),
+            webhookUrl: WebhookUrl.Rehydrate("https://yue.example/hook"));
+        job.Start(Start, Guid.NewGuid());
+        job.Complete(Start, 10, "sha");
+        await _jobs.SaveAsync(job);
+        _clock.SetUtcNow(Start.AddHours(25));
+
+        (await Sut().ExecuteAsync()).PurgedJobs.ShouldBe(1);
+
+        _notifier.Sent.ShouldBeEmpty();
     }
 
     [Fact]
@@ -162,9 +195,10 @@ public class RecoverInterruptedJobsTests
     private readonly FakeOrphanProcessKiller _killer = new();
     private readonly FakeServiceInstance _instance = new();
     private readonly FakeTimeProvider _clock = new(Now);
+    private readonly FakeJobNotifier _notifier = new();
 
     private RecoverInterruptedJobs Sut() => new(
-        _jobs, _workspaces, _queue, _killer, _instance, _clock,
+        _jobs, _workspaces, _queue, _killer, _instance, _notifier, _clock,
         NullLogger<RecoverInterruptedJobs>.Instance);
 
     [Fact]
@@ -196,6 +230,36 @@ public class RecoverInterruptedJobsTests
         stored!.Status.ShouldBe(JobStatus.Failed);
         stored.Error!.Code.ShouldBe(ConversionErrorCode.Interrupted);
         stored.ArtifactsPurged.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Ein_unterbrochener_Auftrag_meldet_sich_an_seiner_Adresse()
+    {
+        var previousRun = Guid.NewGuid();
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, Now, previousRun,
+            webhookUrl: WebhookUrl.Rehydrate("https://yue.example/hook"));
+        job.Start(Now, previousRun);
+        await _jobs.SaveAsync(job);
+
+        await Sut().ExecuteAsync();
+
+        var sent = _notifier.Sent.ShouldHaveSingleItem();
+        sent.Job.Status.ShouldBe(JobStatus.Failed);
+        sent.Job.Error!.Code.ShouldBe(ConversionErrorCode.Interrupted);
+    }
+
+    [Fact]
+    public async Task Ein_erneut_eingereihter_Auftrag_meldet_sich_noch_nicht()
+    {
+        var job = ConversionJob.Create(
+            JobId.New(), VoiceId.New(), "Anna", ConversionOptions.Default, Now, Guid.NewGuid(),
+            webhookUrl: WebhookUrl.Rehydrate("https://yue.example/hook"));
+        await _jobs.SaveAsync(job);
+
+        await Sut().ExecuteAsync();
+
+        _notifier.Sent.ShouldBeEmpty();
     }
 
     [Fact]

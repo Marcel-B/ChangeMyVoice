@@ -1,9 +1,11 @@
+using ChangeMyVoice.Adapters.Notifications;
 using ChangeMyVoice.Adapters.Storage;
 using ChangeMyVoice.Api.Contracts;
 using ChangeMyVoice.Application.UseCases.Jobs;
 using ChangeMyVoice.Domain.Jobs;
 using ChangeMyVoice.Domain.Voices;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace ChangeMyVoice.Api.Endpoints;
 
@@ -25,7 +27,17 @@ internal static class JobEndpoints
                 + "Tonhöhenkonditionierung, wodurch die Tonhöhe sauber übertragen wird. "
                 + "Das dauert länger — bei rund 15 Sekunden Material etwa 60 statt 40 "
                 + "Sekunden. Mit 'f0Condition=false' läuft stattdessen der schnellere "
-                + "Sprachpfad bei 22,05 kHz.")
+                + "Sprachpfad bei 22,05 kHz.\n\n"
+                + "Mit 'webhookUrl' (absolute http- oder https-Adresse) ruft der Dienst "
+                + "diese Adresse per POST auf, sobald der Auftrag COMPLETED, FAILED oder "
+                + "CANCELLED ist, statt dass der Aufrufer alle paar Sekunden nachfragt. "
+                + "Der Rumpf ist JSON mit 'event' (\"job.finished\"), 'jobId', 'status', "
+                + "'voiceId', 'finishedAtUtc', 'error', 'statusUrl', 'resultUrl', "
+                + "'resultSizeBytes' und 'resultSha256'; der Kopf 'X-ChangeMyVoice-Event' "
+                + "nennt die Art. Antwortet der Empfänger nicht mit 2xx, wird bei "
+                + "Zeitablauf, 408, 429 und 5xx mit wachsendem Abstand wiederholt. Die "
+                + "Nachricht ist nicht signiert und nur ein Anstoß: Verbindlich bleibt "
+                + "der Status, den der Empfänger daraufhin abfragt.")
             .DisableAntiforgery()
             .Produces<JobResponse>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -91,8 +103,10 @@ internal static class JobEndpoints
         [FromForm] bool? f0Condition,
         [FromForm] bool? fp16,
         [FromForm] int? outputSampleRate,
+        [FromForm] string? webhookUrl,
         ISubmitConversionJob useCase,
         FileSystemJobWorkspaceStore workspaces,
+        IOptions<WebhookOptions> webhookOptions,
         CancellationToken cancellationToken)
     {
         if (!VoiceId.TryParse(voiceId, out var id))
@@ -111,13 +125,25 @@ internal static class JobEndpoints
                 extensions: new Dictionary<string, object?> { ["code"] = "INVALID_INPUT" });
         }
 
+        WebhookUrl? webhook = null;
+        if (webhookUrl is not null &&
+            !WebhookUrl.TryCreate(
+                webhookUrl, webhookOptions.Value.AllowedHosts, out webhook, out var webhookError))
+        {
+            return TypedResults.Problem(
+                detail: webhookError,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Ungültige Webhook-Adresse",
+                extensions: new Dictionary<string, object?> { ["code"] = "INVALID_INPUT" });
+        }
+
         var upload = await UploadBuffer
             .StoreAsync(source, workspaces, cancellationToken).ConfigureAwait(false);
 
         try
         {
             var result = await useCase
-                .ExecuteAsync(new SubmitConversionJobCommand(id, upload, options), cancellationToken)
+                .ExecuteAsync(new SubmitConversionJobCommand(id, upload, options, webhook), cancellationToken)
                 .ConfigureAwait(false);
 
             if (!result.IsSuccess)

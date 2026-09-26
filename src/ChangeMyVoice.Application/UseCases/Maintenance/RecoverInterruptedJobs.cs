@@ -39,6 +39,7 @@ public sealed class RecoverInterruptedJobs(
     IJobQueue queue,
     IOrphanProcessKiller processKiller,
     IServiceInstance instance,
+    IJobNotifier notifier,
     TimeProvider clock,
     ILogger<RecoverInterruptedJobs> logger) : IRecoverInterruptedJobs
 {
@@ -73,6 +74,7 @@ public sealed class RecoverInterruptedJobs(
                         await workspaces.DeleteAsync(job.Id, cancellationToken).ConfigureAwait(false);
                         job.MarkArtifactsPurged();
                         await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
+                        notifier.NotifyFinished(job);
                     }
 
                     break;
@@ -95,6 +97,7 @@ public sealed class RecoverInterruptedJobs(
                     await workspaces.DeleteAsync(job.Id, cancellationToken).ConfigureAwait(false);
                     job.MarkArtifactsPurged();
                     await jobs.SaveAsync(job, cancellationToken).ConfigureAwait(false);
+                    notifier.NotifyFinished(job);
 
                     interrupted++;
                     break;
