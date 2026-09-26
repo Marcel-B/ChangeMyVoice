@@ -206,8 +206,10 @@ def convert(args, inference, parts):
         f0_source = None
         f0_ref = None
         if f0_condition:
-            f0_source = torch.from_numpy(f0_fn(source_16k[0], thred=0.03)).to(device)[None]
-            f0_ref = torch.from_numpy(f0_fn(ref_16k[0], thred=0.03)).to(device)[None]
+            # RMVPE liefert float64; MPS kennt float64 nicht, also vor dem
+            # Verschieben auf das Geraet nach float32 wandeln.
+            f0_source = torch.from_numpy(f0_fn(source_16k[0], thred=0.03)).float().to(device)[None]
+            f0_ref = torch.from_numpy(f0_fn(ref_16k[0], thred=0.03)).float().to(device)[None]
             voiced = f0_source > 1
             shifted = f0_source.clone()
             if args.auto_f0_adjust and voiced.any() and (f0_ref > 1).any():
