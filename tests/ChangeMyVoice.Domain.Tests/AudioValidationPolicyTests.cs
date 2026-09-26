@@ -162,3 +162,73 @@ public class TargetAudioFormatTests
         options.TargetFormat.SampleRate.ShouldBe(22050);
     }
 }
+
+public class ReferenceClipTests
+{
+    private static AudioProperties Props(double seconds) =>
+        new("pcm_s16le", TimeSpan.FromSeconds(seconds), 44100, 1);
+
+    [Fact]
+    public void Ohne_Ausschnitt_bleibt_eine_kurze_Referenz_unbeanstandet()
+    {
+        var result = AudioValidationPolicy.Validate(Props(seconds: 10), AudioRole.Reference);
+
+        result.ShouldBe(AudioValidationResult.Valid);
+    }
+
+    [Fact]
+    public void Ein_Ausschnitt_in_der_Mitte_nennt_Beginn_und_Laenge()
+    {
+        ReferenceClip.TryCreate(20, 35, out var clip, out _).ShouldBeTrue();
+
+        var result = AudioValidationPolicy.Validate(Props(seconds: 60), AudioRole.Reference, clip: clip);
+
+        result.IsValid.ShouldBeTrue();
+        result.StartAt.ShouldBe(TimeSpan.FromSeconds(20));
+        result.WillBeTruncatedTo.ShouldBe(TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void Ein_Ende_hinter_der_Aufnahme_zaehlt_bis_zu_ihrem_Ende()
+    {
+        ReferenceClip.TryCreate(5, 100, out var clip, out _).ShouldBeTrue();
+
+        var result = AudioValidationPolicy.Validate(Props(seconds: 20), AudioRole.Reference, clip: clip);
+
+        result.IsValid.ShouldBeTrue();
+        result.StartAt.ShouldBe(TimeSpan.FromSeconds(5));
+        result.WillBeTruncatedTo.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Ein_zu_kurzer_Ausschnitt_ist_eine_zu_kurze_Referenz()
+    {
+        ReferenceClip.TryCreate(10, 11, out var clip, out _).ShouldBeTrue();
+
+        var result = AudioValidationPolicy.Validate(Props(seconds: 60), AudioRole.Reference, clip: clip);
+
+        result.ErrorCode.ShouldBe(ConversionErrorCode.ReferenceTooShort);
+    }
+
+    [Fact]
+    public void Ein_Beginn_hinter_der_Aufnahme_wird_abgelehnt()
+    {
+        ReferenceClip.TryCreate(30, null, out var clip, out _).ShouldBeTrue();
+
+        var result = AudioValidationPolicy.Validate(Props(seconds: 20), AudioRole.Reference, clip: clip);
+
+        result.ErrorCode.ShouldBe(ConversionErrorCode.InvalidAudio);
+    }
+
+    [Theory]
+    [InlineData(-1.0, null)]
+    [InlineData(10.0, 10.0)]
+    [InlineData(10.0, 5.0)]
+    [InlineData(null, 0.0)]
+    [InlineData(double.NaN, null)]
+    public void Unsinnige_Grenzen_werden_zurueckgewiesen(double? start, double? end)
+    {
+        ReferenceClip.TryCreate(start, end, out _, out var error).ShouldBeFalse();
+        error.ShouldNotBeNullOrWhiteSpace();
+    }
+}

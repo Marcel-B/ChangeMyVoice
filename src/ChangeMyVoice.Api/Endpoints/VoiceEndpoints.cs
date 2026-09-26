@@ -20,7 +20,13 @@ internal static class VoiceEndpoints
                 + "Angenommen werden WAV, MP3, FLAC, M4A/AAC und OGG/Opus; die Datei wird "
                 + "geprüft und intern als Mono-PCM-WAV mit 44,1 kHz gespeichert. "
                 + "Aufnahmen über 25 Sekunden werden gekürzt, weil das Modell ohnehin nur "
-                + "diesen Anfang verwendet.")
+                + "diesen Anfang verwendet.\n\n"
+                + "Mit 'startSeconds' und 'endSeconds' (beide optional, in Sekunden, mit Punkt "
+                + "als Dezimaltrenner) wird nur dieser Ausschnitt abgelegt, etwa um die besten "
+                + "25 Sekunden statt des Anfangs zu nehmen; ist er länger als 25 Sekunden, "
+                + "zählen die ersten 25 ab 'startSeconds'. Ein Ausschnitt kürzer als 3 "
+                + "Sekunden wird mit REFERENCE_TOO_SHORT abgelehnt, einer hinter dem Ende der "
+                + "Aufnahme mit INVALID_AUDIO, 'endSeconds' vor 'startSeconds' mit 400.")
             .DisableAntiforgery()
             .Produces<ReferenceVoiceResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -72,6 +78,8 @@ internal static class VoiceEndpoints
     private static async Task<IResult> AddAsync(
         [FromForm] string label,
         IFormFile file,
+        [FromForm] double? startSeconds,
+        [FromForm] double? endSeconds,
         IAddReferenceVoice useCase,
         FileSystemJobWorkspaceStore workspaces,
         CancellationToken cancellationToken)
@@ -82,7 +90,7 @@ internal static class VoiceEndpoints
         try
         {
             var result = await useCase
-                .ExecuteAsync(new AddReferenceVoiceCommand(label, upload), cancellationToken)
+                .ExecuteAsync(new AddReferenceVoiceCommand(label, upload, startSeconds, endSeconds), cancellationToken)
                 .ConfigureAwait(false);
 
             return result.IsSuccess

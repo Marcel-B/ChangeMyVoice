@@ -978,7 +978,7 @@
         ]
       },
       "post": {
-        "description": "Nimmt eine Aufnahme der Zielstimme entgegen und legt sie dauerhaft ab. Angenommen werden WAV, MP3, FLAC, M4A/AAC und OGG/Opus; die Datei wird geprüft und intern als Mono-PCM-WAV mit 44,1 kHz gespeichert. Aufnahmen über 25 Sekunden werden gekürzt, weil das Modell ohnehin nur diesen Anfang verwendet.",
+        "description": "Nimmt eine Aufnahme der Zielstimme entgegen und legt sie dauerhaft ab. Angenommen werden WAV, MP3, FLAC, M4A/AAC und OGG/Opus; die Datei wird geprüft und intern als Mono-PCM-WAV mit 44,1 kHz gespeichert. Aufnahmen über 25 Sekunden werden gekürzt, weil das Modell ohnehin nur diesen Anfang verwendet.\n\nMit 'startSeconds' und 'endSeconds' (beide optional, in Sekunden, mit Punkt als Dezimaltrenner) wird nur dieser Ausschnitt abgelegt, etwa um die besten 25 Sekunden statt des Anfangs zu nehmen; ist er länger als 25 Sekunden, zählen die ersten 25 ab 'startSeconds'. Ein Ausschnitt kürzer als 3 Sekunden wird mit REFERENCE_TOO_SHORT abgelehnt, einer hinter dem Ende der Aufnahme mit INVALID_AUDIO, 'endSeconds' vor 'startSeconds' mit 400.",
         "operationId": "AddReferenceVoice",
         "requestBody": {
           "content": {
@@ -997,6 +997,32 @@
                     "properties": {
                       "file": {
                         "$ref": "#/components/schemas/IFormFile"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "startSeconds": {
+                        "format": "double",
+                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+                        "type": [
+                          "number",
+                          "string"
+                        ]
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "endSeconds": {
+                        "format": "double",
+                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+                        "type": [
+                          "number",
+                          "string"
+                        ]
                       }
                     },
                     "type": "object"

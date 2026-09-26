@@ -50,7 +50,7 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
-| `POST` | `/voices` | Referenzstimme senden |
+| `POST` | `/voices` | Referenzstimme senden (optional nur ein Ausschnitt) |
 | `GET` | `/voices` | Alle Referenzstimmen anzeigen |
 | `GET` | `/voices/{id}` | Einzelne Referenzstimme abrufen |
 | `GET` | `/voices/{id}/audio` | Aufnahme einer Referenzstimme herunterladen (der Master: Mono, 44,1 kHz, höchstens 25 s) |
@@ -189,6 +189,17 @@ höheren der beiden Raten, damit eine einzige Datei beide Pfade bedient.
 
 Referenzen über 25 Sekunden werden gekürzt und das auch gemeldet: Seed-VC
 verwendet mit `ref_audio[: sr * 25]` ohnehin nur diesen Anfang.
+
+Welche 25 Sekunden das sind, lässt sich beim Anlegen wählen: `startSeconds` und
+`endSeconds` (beide optional, Punkt als Dezimaltrenner) legen nur diesen
+Ausschnitt ab, etwa die Strophe statt des Intros. Ist er länger als 25 Sekunden,
+zählen die ersten 25 ab `startSeconds`. Ein Ausschnitt unter 3 Sekunden gibt
+`REFERENCE_TOO_SHORT`, einer hinter dem Ende der Aufnahme `INVALID_AUDIO`.
+
+```bash
+curl -H "X-Api-Key: $KEY" -F label=Anna -F file=@anna.m4a \
+     -F startSeconds=42.5 -F endSeconds=67.5 http://mac:5080/api/v1/voices
+```
 
 ## Aufräumen
 

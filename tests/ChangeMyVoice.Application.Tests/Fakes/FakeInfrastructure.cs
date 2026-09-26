@@ -137,6 +137,9 @@ public sealed class FakeAudioNormalizer : IAudioNormalizer
     /// <summary>Die durchgeführten Umwandlungen.</summary>
     public List<(string Source, string Destination, int SampleRate, TimeSpan? MaxDuration)> Calls { get; } = [];
 
+    /// <summary>Ab wo jede Umwandlung begann, in derselben Reihenfolge.</summary>
+    public List<TimeSpan?> StartAts { get; } = [];
+
     /// <summary>Wird geworfen, wenn gesetzt.</summary>
     public Exception? ThrowOnNormalize { get; set; }
 
@@ -145,7 +148,8 @@ public sealed class FakeAudioNormalizer : IAudioNormalizer
         AudioArtifactRef destination,
         TargetAudioFormat format,
         TimeSpan? maxDuration = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TimeSpan? startAt = null)
     {
         if (ThrowOnNormalize is not null)
         {
@@ -153,6 +157,7 @@ public sealed class FakeAudioNormalizer : IAudioNormalizer
         }
 
         Calls.Add((source.Locator, destination.Locator, format.SampleRate, maxDuration));
+        StartAts.Add(startAt);
         return Task.CompletedTask;
     }
 }

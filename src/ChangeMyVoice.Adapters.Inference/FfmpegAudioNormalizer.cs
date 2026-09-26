@@ -28,7 +28,8 @@ public sealed class FfmpegAudioNormalizer(
         AudioArtifactRef destination,
         TargetAudioFormat format,
         TimeSpan? maxDuration = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TimeSpan? startAt = null)
     {
         var directory = Path.GetDirectoryName(destination.Locator);
         if (!string.IsNullOrEmpty(directory))
@@ -42,8 +43,16 @@ public sealed class FfmpegAudioNormalizer(
             "-v", "error",
             // Vorhandene Zieldatei überschreiben, statt auf eine Rückfrage zu warten.
             "-y",
-            "-i", source.Locator,
         };
+
+        // Vor der Eingabe gesetzt sucht ffmpeg die Stelle direkt an; bei
+        // Audio ist das seit Langem genau auf die Abtastung.
+        if (startAt is { } start && start > TimeSpan.Zero)
+        {
+            arguments.AddRange(["-ss", start.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture)]);
+        }
+
+        arguments.AddRange(["-i", source.Locator]);
 
         if (maxDuration is { } limit)
         {

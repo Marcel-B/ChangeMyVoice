@@ -176,6 +176,28 @@ public class FfmpegAudioNormalizerTests : IDisposable
         properties!.Duration.TotalSeconds.ShouldBe(25, tolerance: 0.5);
     }
 
+    [SkippableFact]
+    public async Task Ein_Ausschnitt_beginnt_an_der_angegebenen_Stelle()
+    {
+        Skip.IfNot(AudioFixtures.FfmpegAvailable, "ffmpeg ist nicht verfügbar.");
+        var source = _fixtures.CreateTone("lang-ausschnitt.wav", seconds: 40);
+        var destination = _fixtures.PathFor("ausschnitt.wav");
+
+        await Sut().NormalizeAsync(
+            new AudioArtifactRef(source),
+            new AudioArtifactRef(destination),
+            TargetAudioFormat.ReferenceMaster,
+            maxDuration: TimeSpan.FromSeconds(25),
+            startAt: TimeSpan.FromSeconds(30));
+
+        var probe = new FfprobeAudioProbe(
+            Options.Create(new AudioToolingOptions()), NullLogger<FfprobeAudioProbe>.Instance);
+        var properties = await probe.ProbeAsync(new AudioArtifactRef(destination));
+
+        // Ab Sekunde 30 bleiben von 40 nur 10, auch wenn 25 erlaubt wären.
+        properties!.Duration.TotalSeconds.ShouldBe(10, tolerance: 0.5);
+    }
+
     [Fact]
     public async Task Eine_unlesbare_Quelle_fuehrt_zu_einem_klaren_Fehler()
     {
