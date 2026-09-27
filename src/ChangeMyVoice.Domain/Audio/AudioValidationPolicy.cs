@@ -45,12 +45,15 @@ public sealed record AudioLimits(
 /// <param name="ErrorCode">Der Fehlercode, oder <c>null</c>, wenn die Datei brauchbar ist.</param>
 /// <param name="Message">Eine für Aufrufer gedachte Begründung.</param>
 /// <param name="WillBeTruncatedTo">
-/// Gesetzt, wenn die Datei zwar angenommen, aber gekürzt wird.
+/// Gesetzt, wenn die Datei zwar angenommen, aber gekürzt wird: die Länge, die
+/// ab <paramref name="StartAt" /> verwendet wird.
 /// </param>
+/// <param name="StartAt">Gesetzt, wenn die Aufnahme nicht am Anfang beginnt.</param>
 public sealed record AudioValidationResult(
     ConversionErrorCode? ErrorCode,
     string? Message,
-    TimeSpan? WillBeTruncatedTo = null)
+    TimeSpan? WillBeTruncatedTo = null,
+    TimeSpan? StartAt = null)
 {
     /// <summary>Ob die Datei verwendet werden kann.</summary>
     public bool IsValid => ErrorCode is null;
@@ -91,10 +94,15 @@ public static class AudioValidationPolicy
         };
 
     /// <summary>Prüft eine Datei in ihrer jeweiligen Rolle.</summary>
+    /// <param name="properties">Die gemessenen Eigenschaften.</param>
+    /// <param name="role">Wofür die Datei dient.</param>
+    /// <param name="limits">Die Grenzwerte, sonst die Voreinstellung.</param>
+    /// <param name="clip">Bei einer Referenz der gewählte Ausschnitt.</param>
     public static AudioValidationResult Validate(
         AudioProperties? properties,
         AudioRole role,
-        AudioLimits? limits = null)
+        AudioLimits? limits = null,
+        ReferenceClip? clip = null)
     {
         limits ??= AudioLimits.Default;
 
@@ -136,28 +144,54 @@ public static class AudioValidationPolicy
 
         return role switch
         {
-            AudioRole.Reference => ValidateReference(properties, limits),
+            AudioRole.Reference => ValidateReference(properties, limits, clip ?? ReferenceClip.Whole),
             AudioRole.Source => ValidateSource(properties, limits),
             _ => AudioValidationResult.Valid,
         };
     }
 
-    private static AudioValidationResult ValidateReference(AudioProperties properties, AudioLimits limits)
+    private static AudioValidationResult ValidateReference(
+        AudioProperties properties, AudioLimits limits, ReferenceClip clip)
     {
-        if (properties.Duration < limits.MinReferenceDuration)
+        if (clip.Start >= properties.Duration)
+        {
+            return AudioValidationResult.Invalid(
+                ConversionErrorCode.InvalidAudio,
+                $"Der Ausschnitt beginnt bei {clip.Start.TotalSeconds:0.###} Sekunden, die Aufnahme "
+                + $"ist aber nur {properties.Duration.TotalSeconds:0.###} Sekunden lang.");
+        }
+
+        var length = clip.LengthIn(properties.Duration);
+
+        if (length < limits.MinReferenceDuration)
         {
             return AudioValidationResult.Invalid(
                 ConversionErrorCode.ReferenceTooShort,
-                $"Die Referenz muss mindestens {limits.MinReferenceDuration.TotalSeconds:0.###} "
-                + "Sekunden lang sein.");
+                clip.IsWhole
+                    ? $"Die Referenz muss mindestens {limits.MinReferenceDuration.TotalSeconds:0.###} "
+                      + "Sekunden lang sein."
+                    : $"Der Ausschnitt muss mindestens {limits.MinReferenceDuration.TotalSeconds:0.###} "
+                      + "Sekunden lang sein.");
         }
+
+        var startAt = clip.Start > TimeSpan.Zero ? clip.Start : (TimeSpan?)null;
 
         // Längere Referenzen werden angenommen, aber gekürzt: Seed-VC verwendet
         // ohnehin nur die ersten 25 Sekunden. Das offen zu melden ist ehrlicher,
         // als den Aufrufer glauben zu lassen, seine ganze Datei werde genutzt.
-        return properties.Duration > limits.MaxReferenceDuration
-            ? AudioValidationResult.Truncated(limits.MaxReferenceDuration)
-            : AudioValidationResult.Valid;
+        if (length > limits.MaxReferenceDuration)
+        {
+            return AudioValidationResult.Truncated(limits.MaxReferenceDuration) with { StartAt = startAt };
+        }
+
+        // Ein Ausschnitt, der vor dem Ende der Aufnahme aufhört, ist ebenfalls
+        // eine Kürzung, nur eine gewünschte.
+        return clip.IsWhole
+            ? AudioValidationResult.Valid
+            : new AudioValidationResult(
+                null, null,
+                clip.End is { } end && end < properties.Duration ? length : null,
+                startAt);
     }
 
     private static AudioValidationResult ValidateSource(AudioProperties properties, AudioLimits limits)

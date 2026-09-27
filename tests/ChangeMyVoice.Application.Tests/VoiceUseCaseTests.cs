@@ -88,6 +88,51 @@ public class AddReferenceVoiceTests
     }
 
     [Fact]
+    public async Task Ein_Ausschnitt_wird_ab_seinem_Beginn_abgelegt()
+    {
+        _probe.SetFor(Upload, new AudioProperties("pcm_s16le", TimeSpan.FromMinutes(3), 44100, 1));
+
+        var result = await Sut().ExecuteAsync(new AddReferenceVoiceCommand("Anna", Upload, 40, 60));
+
+        result.IsSuccess.ShouldBeTrue();
+        _normalizer.Calls.ShouldHaveSingleItem().MaxDuration.ShouldBe(TimeSpan.FromSeconds(20));
+        _normalizer.StartAts.ShouldHaveSingleItem().ShouldBe(TimeSpan.FromSeconds(40));
+    }
+
+    [Fact]
+    public async Task Ein_zu_langer_Ausschnitt_wird_ab_seinem_Beginn_auf_25_Sekunden_gekuerzt()
+    {
+        _probe.SetFor(Upload, new AudioProperties("pcm_s16le", TimeSpan.FromMinutes(3), 44100, 1));
+
+        var result = await Sut().ExecuteAsync(new AddReferenceVoiceCommand("Anna", Upload, 30, null));
+
+        result.IsSuccess.ShouldBeTrue();
+        _normalizer.Calls.ShouldHaveSingleItem().MaxDuration.ShouldBe(TimeSpan.FromSeconds(25));
+        _normalizer.StartAts.ShouldHaveSingleItem().ShouldBe(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task Ein_Ende_vor_dem_Beginn_ist_eine_ungueltige_Eingabe()
+    {
+        var result = await Sut().ExecuteAsync(new AddReferenceVoiceCommand("Anna", Upload, 20, 10));
+
+        result.Error!.Code.ShouldBe(OperationErrorCode.InvalidInput);
+        _normalizer.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Ein_Ausschnitt_hinter_dem_Ende_der_Aufnahme_wird_abgelehnt()
+    {
+        _probe.SetFor(Upload, new AudioProperties("pcm_s16le", TimeSpan.FromSeconds(12), 44100, 1));
+
+        var result = await Sut().ExecuteAsync(new AddReferenceVoiceCommand("Anna", Upload, 30, null));
+
+        result.Error!.Code.ShouldBe(OperationErrorCode.AudioRejected);
+        result.Error.AudioErrorCode.ShouldBe(ConversionErrorCode.InvalidAudio);
+        _storage.StoredCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Eine_zu_lange_Referenz_wird_angenommen_und_gekuerzt()
     {
         _probe.SetFor(Upload, new AudioProperties("pcm_s16le", TimeSpan.FromMinutes(3), 44100, 1));

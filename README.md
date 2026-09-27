@@ -50,7 +50,7 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
-| `POST` | `/voices` | Referenzstimme senden |
+| `POST` | `/voices` | Referenzstimme senden (optional nur ein Ausschnitt) |
 | `GET` | `/voices` | Alle Referenzstimmen anzeigen |
 | `GET` | `/voices/{id}` | Einzelne Referenzstimme abrufen |
 | `GET` | `/voices/{id}/audio` | Aufnahme einer Referenzstimme herunterladen (der Master: Mono, 44,1 kHz, höchstens 25 s) |
@@ -60,6 +60,8 @@ Alle unter `/api/v1` und nur mit gültigem `X-Api-Key`.
 | `GET` | `/jobs/{id}` | Status abfragen |
 | `GET` | `/jobs/{id}/result` | Ergebnis herunterladen |
 | `DELETE` | `/jobs/{id}` | Auftrag abbrechen |
+| `GET` | `/model` | Ob das Modell gerade geladen ist und wann es entladen wird |
+| `DELETE` | `/model` | Modell sofort entladen (409 `MODEL_BUSY`, solange ein Auftrag läuft) |
 | `GET` | `/health/live` | Lebenszeichen (ohne Schlüssel) |
 | `GET` | `/health/ready` | Bereitschaft von Modell und Werkzeugen |
 
@@ -143,6 +145,27 @@ das fertige Audio; das Timbre bleibt deshalb unverfälscht. Ohne
 F0-Konditionierung (`f0Condition=false`) gibt es keinen solchen Verlauf, beide
 Felder werden dann mit 400 abgelehnt.
 
+### Modell im Speicher
+
+Das Laden von Seed-VC kostet je Auftrag die Zeit, die das Log als
+Modellladezeit nennt. Deshalb bleibt der Python-Prozess nach einem Lauf samt
+Modell stehen (`scripts/changemyvoice_infer.py --serve`), und der nächste
+Auftrag rechnet sofort; sein Log meldet dann „Das Modell ist bereits geladen“.
+Entladen wird
+
+- nach `Inference:KeepModelLoadedFor` ohne Auftrag (Standard `00:05:00`),
+- mit `DELETE /api/v1/model`, etwa bevor auf demselben Mac YuE2 oder ein
+  Textmodell lädt, denn die teilen sich mit Seed-VC 24 GB,
+- nach jedem gescheiterten Lauf, weil einem Modell nach zu wenig Speicher oder
+  einem Fehler der Grafikbeschleunigung nicht mehr zu trauen ist,
+- wenn ein Auftrag den anderen Pfad braucht (mit oder ohne F0-Konditionierung,
+  fp16), denn dafür ist ein anderer Checkpoint nötig.
+
+Mit `KeepModelLoadedFor` `00:00:00` startet jeder Lauf wie früher einen eigenen
+Prozess; nur dann laufen bei `Worker:MaxConcurrentInference` über 1 wirklich
+mehrere Läufe gleichzeitig, sonst teilen sie sich das eine geladene Modell
+nacheinander.
+
 ## Audio-Formate
 
 Angenommen werden **WAV, MP3, FLAC, M4A/AAC und OGG/Opus** — Clients müssen kein
@@ -166,6 +189,17 @@ höheren der beiden Raten, damit eine einzige Datei beide Pfade bedient.
 
 Referenzen über 25 Sekunden werden gekürzt und das auch gemeldet: Seed-VC
 verwendet mit `ref_audio[: sr * 25]` ohnehin nur diesen Anfang.
+
+Welche 25 Sekunden das sind, lässt sich beim Anlegen wählen: `startSeconds` und
+`endSeconds` (beide optional, Punkt als Dezimaltrenner) legen nur diesen
+Ausschnitt ab, etwa die Strophe statt des Intros. Ist er länger als 25 Sekunden,
+zählen die ersten 25 ab `startSeconds`. Ein Ausschnitt unter 3 Sekunden gibt
+`REFERENCE_TOO_SHORT`, einer hinter dem Ende der Aufnahme `INVALID_AUDIO`.
+
+```bash
+curl -H "X-Api-Key: $KEY" -F label=Anna -F file=@anna.m4a \
+     -F startSeconds=42.5 -F endSeconds=67.5 http://mac:5080/api/v1/voices
+```
 
 ## Aufräumen
 
@@ -327,12 +361,6 @@ sich nur an einer tatsächlich umgewandelten Datei nachmessen.
 
 ## Bekannte Punkte
 
-- **Modell-Ladezeit pro Auftrag.** `scripts/changemyvoice_infer.py` lädt
-  Seed-VC bei jedem Auftrag neu; ein dauerhaft geladener Arbeiter, wie ihn
-  init.md §22 vorschlägt, fehlt noch. Die Ladezeit wird gemessen und
-  protokolliert, damit ein späterer Umbau begründet entschieden werden kann;
-  hinter `IVoiceConversionEngine` ist er austauschbar, ohne dass Domäne,
-  Anwendungsfälle oder API sich ändern.
 - **Eigene Inferenz statt `mlx_vc.backend.run_backend`.** Dessen
   Seed-VC-Backend lädt im Gesangspfad das F0-Modell, gibt den
   Tonhöhenverlauf aber nie an das Modell weiter; das Modell rät die Tonhöhe

@@ -26,7 +26,13 @@ public sealed record ReferenceVoiceView(
 /// <summary>Die Eingaben zum Anlegen einer Referenzstimme.</summary>
 /// <param name="Label">Die gewünschte Bezeichnung.</param>
 /// <param name="Upload">Die bereits abgelegte Uploaddatei.</param>
-public sealed record AddReferenceVoiceCommand(string? Label, AudioArtifactRef Upload);
+/// <param name="StartSeconds">Ab wo die Aufnahme verwendet wird, leer für den Anfang.</param>
+/// <param name="EndSeconds">Bis wohin, leer für das Ende.</param>
+public sealed record AddReferenceVoiceCommand(
+    string? Label,
+    AudioArtifactRef Upload,
+    double? StartSeconds = null,
+    double? EndSeconds = null);
 
 /// <summary>Nimmt eine neue Referenzstimme entgegen.</summary>
 public interface IAddReferenceVoice
@@ -53,6 +59,11 @@ public sealed class AddReferenceVoice(
             return Result<ReferenceVoiceView>.Failure(OperationErrorCode.InvalidInput, labelError!);
         }
 
+        if (!ReferenceClip.TryCreate(command.StartSeconds, command.EndSeconds, out var clip, out var clipError))
+        {
+            return Result<ReferenceVoiceView>.Failure(OperationErrorCode.InvalidInput, clipError!);
+        }
+
         if (await repository.ExistsWithLabelAsync(label, cancellationToken).ConfigureAwait(false))
         {
             return Result<ReferenceVoiceView>.Failure(
@@ -65,7 +76,7 @@ public sealed class AddReferenceVoice(
         var original = await probe.ProbeAsync(command.Upload, cancellationToken)
             .ConfigureAwait(false);
 
-        var validation = AudioValidationPolicy.Validate(original, AudioRole.Reference);
+        var validation = AudioValidationPolicy.Validate(original, AudioRole.Reference, clip: clip);
         if (!validation.IsValid)
         {
             return Result<ReferenceVoiceView>.Failure(new OperationError(
@@ -85,7 +96,8 @@ public sealed class AddReferenceVoice(
                 master,
                 TargetAudioFormat.ReferenceMaster,
                 validation.WillBeTruncatedTo,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                validation.StartAt).ConfigureAwait(false);
 
             var stored = await probe.ProbeAsync(master, cancellationToken).ConfigureAwait(false);
 

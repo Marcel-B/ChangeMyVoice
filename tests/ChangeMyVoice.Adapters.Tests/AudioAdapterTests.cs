@@ -176,6 +176,28 @@ public class FfmpegAudioNormalizerTests : IDisposable
         properties!.Duration.TotalSeconds.ShouldBe(25, tolerance: 0.5);
     }
 
+    [SkippableFact]
+    public async Task Ein_Ausschnitt_beginnt_an_der_angegebenen_Stelle()
+    {
+        Skip.IfNot(AudioFixtures.FfmpegAvailable, "ffmpeg ist nicht verfügbar.");
+        var source = _fixtures.CreateTone("lang-ausschnitt.wav", seconds: 40);
+        var destination = _fixtures.PathFor("ausschnitt.wav");
+
+        await Sut().NormalizeAsync(
+            new AudioArtifactRef(source),
+            new AudioArtifactRef(destination),
+            TargetAudioFormat.ReferenceMaster,
+            maxDuration: TimeSpan.FromSeconds(25),
+            startAt: TimeSpan.FromSeconds(30));
+
+        var probe = new FfprobeAudioProbe(
+            Options.Create(new AudioToolingOptions()), NullLogger<FfprobeAudioProbe>.Instance);
+        var properties = await probe.ProbeAsync(new AudioArtifactRef(destination));
+
+        // Ab Sekunde 30 bleiben von 40 nur 10, auch wenn 25 erlaubt wären.
+        properties!.Duration.TotalSeconds.ShouldBe(10, tolerance: 0.5);
+    }
+
     [Fact]
     public async Task Eine_unlesbare_Quelle_fuehrt_zu_einem_klaren_Fehler()
     {
@@ -201,6 +223,7 @@ public class MlxVcConversionEngineTests
             ScriptPath = "/pfad/zu/skript.py",
             WorkingDirectory = "/pfad/zu/mlx-vc",
         }),
+        TimeProvider.System,
         NullLogger<MlxVcConversionEngine>.Instance);
 
     private static ConversionRequest Request(ConversionOptions? options = null) => new(
@@ -293,6 +316,39 @@ public class MlxVcConversionEngineTests
 
         environment["SEED_VC_PATH"].ShouldBe("/seed-vc-ref");
         environment["HF_HUB_CACHE"].ShouldBe("/cache");
+    }
+
+    [Fact]
+    public void Der_Dauerbetrieb_bekommt_nur_die_Modellschalter()
+    {
+        var arguments = Sut().BuildServeArguments(new ModelKey(F0Condition: true, Fp16: false));
+
+        arguments[0].ShouldBe("/pfad/zu/skript.py");
+        arguments.ShouldContain("--serve");
+        arguments.ShouldContain("--f0-condition");
+        arguments.ShouldContain("--no-fp16");
+        arguments.ShouldNotContain("--source");
+        arguments.ShouldNotContain(argument => MlxVcConversionEngine.ForbiddenArgumentMarkers.Any(
+            marker => string.Equals(argument, marker, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void Die_Auftragszeile_traegt_Dateien_und_Stellschrauben()
+    {
+        ConversionOptions.TryCreate(30, 0.5, 1.1, null, null, null, -12, true, out var options, out _);
+
+        using var document = System.Text.Json.JsonDocument.Parse(
+            MlxVcConversionEngine.BuildServeRequest(Request(options)));
+        var root = document.RootElement;
+
+        root.GetProperty("source").GetString().ShouldBe("/tmp/source.wav");
+        root.GetProperty("reference").GetString().ShouldBe("/tmp/reference.wav");
+        root.GetProperty("output").GetString().ShouldBe("/tmp/output.wav");
+        root.GetProperty("diffusionSteps").GetInt32().ShouldBe(30);
+        root.GetProperty("inferenceCfgRate").GetDouble().ShouldBe(0.5);
+        root.GetProperty("lengthAdjust").GetDouble().ShouldBe(1.1);
+        root.GetProperty("semiToneShift").GetInt32().ShouldBe(-12);
+        root.GetProperty("autoF0Adjust").GetBoolean().ShouldBeTrue();
     }
 
     [Theory]

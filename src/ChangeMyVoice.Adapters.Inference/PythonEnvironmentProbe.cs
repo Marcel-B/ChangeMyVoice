@@ -8,9 +8,10 @@ namespace ChangeMyVoice.Adapters.Inference;
 /// Prüft, ob Modell und Werkzeuge einsatzbereit sind.
 /// </summary>
 /// <remarks>
-/// Bewusst ohne vollständigen Probelauf: Da die Modelle bei jedem Auftrag ohnehin
-/// neu geladen werden, brächte ein Aufwärmlauf keinen Zeitvorteil, würde den
-/// Dienststart aber um Minuten verzögern. Geprüft wird deshalb nur, was schnell
+/// Bewusst ohne vollständigen Probelauf: Das Modell wird erst mit dem ersten
+/// Auftrag geladen und nach einer Leerlaufzeit wieder entladen, ein Aufwärmlauf
+/// beim Start würde also nur Speicher belegen und den Dienststart um Minuten
+/// verzögern. Geprüft wird deshalb nur, was schnell
 /// geht — und genau das macht den Unterschied zwischen „Dienst läuft, scheitert
 /// aber am ersten Auftrag“ und einer ehrlichen Startmeldung.
 /// </remarks>

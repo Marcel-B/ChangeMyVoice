@@ -36,10 +36,10 @@ public sealed record ConversionOutcome(
 
 /// <summary>Führt die eigentliche Stimmkonvertierung aus.</summary>
 /// <remarks>
-/// Hinter diesem Port liegt derzeit ein Prozessaufruf, der die Modelle bei jedem
-/// Lauf neu lädt — mlx-vc startet intern selbst einen Unterprozess und hält keine
-/// Modelle vor. Sollte das später durch einen dauerhaft laufenden Arbeiter
-/// ersetzt werden, ändert sich nur der Adapter, nicht dieser Vertrag.
+/// Hinter diesem Port liegt ein Python-Prozess, der das Modell zwischen den
+/// Läufen geladen halten kann (<see cref="IInferenceModelHost" />); ob er das
+/// tut oder für jeden Lauf neu startet, ist Sache des Adapters, nicht dieses
+/// Vertrags.
 /// </remarks>
 public interface IVoiceConversionEngine
 {
@@ -94,4 +94,50 @@ public interface IServiceInstance
 {
     /// <summary>Die Kennung dieses Laufs.</summary>
     Guid InstanceId { get; }
+}
+
+/// <summary>Ob und wie lange das Modell zwischen den Aufträgen geladen bleibt.</summary>
+/// <param name="IsLoaded">Ob das Modell gerade im Speicher liegt.</param>
+/// <param name="IsBusy">Ob gerade ein Lauf stattfindet.</param>
+/// <param name="KeepLoadedFor">
+/// Wie lange das Modell nach dem letzten Lauf geladen bleibt; <see cref="TimeSpan.Zero" />,
+/// wenn jeder Lauf es neu lädt.
+/// </param>
+/// <param name="LoadedSinceUtc">Seit wann es geladen ist.</param>
+/// <param name="UnloadAtUtc">Wann es ohne weiteren Auftrag entladen wird.</param>
+public sealed record InferenceModelState(
+    bool IsLoaded,
+    bool IsBusy,
+    TimeSpan KeepLoadedFor,
+    DateTimeOffset? LoadedSinceUtc = null,
+    DateTimeOffset? UnloadAtUtc = null);
+
+/// <summary>Was die Bitte, das Modell zu entladen, bewirkt hat.</summary>
+public enum ModelReleaseResult
+{
+    /// <summary>Es war nichts geladen.</summary>
+    NotLoaded,
+
+    /// <summary>Das Modell wurde entladen und sein Speicher freigegeben.</summary>
+    Released,
+
+    /// <summary>Ein Lauf ist im Gange; entladen wird danach von selbst.</summary>
+    Busy,
+}
+
+/// <summary>
+/// Hält das Modell zwischen den Aufträgen im Speicher und gibt es wieder frei.
+/// </summary>
+/// <remarks>
+/// Das Modell belegt mehrere Gigabyte gemeinsamen Speichers. Andere Modelle auf
+/// demselben Rechner (etwa YuE2 oder ein Textmodell) sollen es freigeben lassen
+/// können, bevor sie selbst laden, statt auf den Leerlauf zu warten.
+/// </remarks>
+public interface IInferenceModelHost
+{
+    /// <summary>Der aktuelle Zustand.</summary>
+    InferenceModelState GetState();
+
+    /// <summary>Entlädt das Modell, sofern kein Lauf im Gange ist.</summary>
+    Task<ModelReleaseResult> ReleaseAsync(CancellationToken cancellationToken = default);
 }

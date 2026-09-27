@@ -124,10 +124,12 @@ public interface IAudioNormalizer
     /// <param name="format">Das gewünschte Zielformat.</param>
     /// <param name="maxDuration">Optionale Kürzung der Länge.</param>
     /// <param name="cancellationToken">Abbruchsteuerung.</param>
+    /// <param name="startAt">Ab wo die Eingabe verwendet wird, sonst ab dem Anfang.</param>
     Task NormalizeAsync(
         AudioArtifactRef source,
         AudioArtifactRef destination,
         TargetAudioFormat format,
         TimeSpan? maxDuration = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        TimeSpan? startAt = null);
 }

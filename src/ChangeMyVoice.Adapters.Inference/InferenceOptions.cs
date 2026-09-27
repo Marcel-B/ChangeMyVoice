@@ -64,6 +64,20 @@ public sealed class InferenceOptions
     /// </summary>
     public string? HuggingFaceCachePath { get; set; }
 
+    /// <summary>
+    /// Wie lange das Modell nach dem letzten Lauf geladen bleibt.
+    /// </summary>
+    /// <remarks>
+    /// Das Laden kostet je Auftrag die Zeit, die <c>modelLoadMs</c> im Log
+    /// nennt; ein stehender Prozess spart sie ab dem zweiten Auftrag
+    /// (init.md §22). Dafür belegt er den Speicher auch ohne Auftrag, und auf
+    /// dem Mac teilen sich YuE2, das Textmodell und Seed-VC 24 GB. Deshalb
+    /// nur ein paar Minuten, und wer den Speicher früher braucht, gibt ihn mit
+    /// <c>DELETE /api/v1/model</c> frei. <see cref="TimeSpan.Zero" /> startet
+    /// wie früher für jeden Lauf einen eigenen Prozess.
+    /// </remarks>
+    public TimeSpan KeepModelLoadedFor { get; set; } = TimeSpan.FromMinutes(5);
+
     /// <summary>Das Modell-Backend.</summary>
     public string Backend { get; set; } = "seed-vc";
 
